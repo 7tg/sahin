@@ -678,6 +678,8 @@ void Screen::refresh_detail()
             if (base.state != State::absent)
                 blocks.push_back(Block::paragraph("Found, but it can't be used: " + base.detail));
         }
+        if (!base.warning.empty())
+            blocks.push_back(Block::paragraph(base.warning));
     }
     else if (app.detail)
     {
@@ -2577,7 +2579,7 @@ Screen::Offer Screen::offer(const App &app) const
         using library::State;
         const auto &base = app.base;
         const bool usable = base.state == State::ready || base.state == State::needs_patch;
-        out.note = base.detail;
+        out.note = base.warning.empty() ? base.detail : base.detail + " " + base.warning;
         // A copy on a USB drive is installed the same way: the install copies it to the
         // console first (base-games, kept for repairs).
         if (usable)

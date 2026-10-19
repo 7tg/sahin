@@ -31,9 +31,12 @@ struct Manifest
     const char *version_file;                 // the file Release tells versions by
     std::span<const Release> releases;
     std::span<const char *const> mod_files;   // signs of mods: not a clean copy
+    bool mods_left_out = false;  // mod files in a copy are left out of the install, not refused
+    bool accept_unknown = false; // an unknown version file is a warning: the copy counts as the
+                                 // first release (the page shows the warning)
 };
 
-// The manifest for a base-games folder name (NFSMW...), or nullptr.
+// The manifest for a base-games folder name (BLUR...), or nullptr.
 const Manifest *manifest_for(const std::string &folder);
 
 enum class State
@@ -53,6 +56,7 @@ struct BaseGame
     bool on_usb = false; // found on a USB drive, not in base-games yet
     std::string version; // the release, when known
     std::string detail;  // for the page: what is missing or wrong
+    std::string warning; // for the page: a copy that is accepted but not quite known
 };
 
 // The game's folder resolved without regard to case ("" when there is none).

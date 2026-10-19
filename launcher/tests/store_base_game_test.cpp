@@ -33,10 +33,9 @@ int main()
     assert(mkdtemp(temporary));
     const fs::path root = temporary;
 
-    // Most Wanted's own manifest is there, and 1.3 is its current release.
-    const Manifest *mw = manifest_for("NFSMW");
-    assert(mw && mw->releases.front().version == std::string("1.3") &&
-           !mw->releases.front().needs_patch && manifest_for("NFSX") == nullptr);
+    // Blur's own manifest: mods are left out, an unknown copy is a warning.
+    const Manifest *blur = manifest_for("BLUR");
+    assert(blur && blur->mods_left_out && blur->accept_unknown && manifest_for("NFSMW") == nullptr);
 
     // A small game of the same shape, its releases told by data.bin.
     const std::string current(3000, 'c'), older(2000, 'o');
@@ -114,6 +113,26 @@ int main()
     fs::create_symlink("/etc/passwd", usb / "game" / "link");
     assert(!import_base((usb / "game").string(), data.string(), game, [](auto &) {}, cancel, error));
     assert(error.find("link") != std::string::npos);
+
+    // A game whose mods are left out and whose unknown copies are accepted.
+    {
+        const char *lfolders[] = {"cache"};
+        const char *lfiles[] = {"game.exe", "cache/root.pak"};
+        const std::string known(100, 'k');
+        const Release lreleases[] = {{"1.2", known.size(), crc(known), false}};
+        const char *lmods[] = {"dsound.dll", "scripts"};
+        Manifest lenient{"LEN", lfolders, lfiles, "cache/root.pak", lreleases, lmods};
+        lenient.mods_left_out = true;
+        lenient.accept_unknown = true;
+        const fs::path copy = root / "len";
+        put(copy / "game.exe", "x");
+        put(copy / "cache" / "root.pak", std::string(7, 'u')); // unknown
+        put(copy / "dsound.dll", "mod");
+        const auto seen = inspect(copy.string(), lenient);
+        assert(seen.state == State::ready && seen.version == "1.2");
+        assert(seen.warning.find("root.pak") != std::string::npos);
+        assert(seen.detail.find("left out") != std::string::npos);
+    }
 
     fs::remove_all(root);
     std::cout << "Base game checks passed\n";

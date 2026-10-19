@@ -17,23 +17,24 @@ namespace
 {
 // ---- the games ----------------------------------------------------------------
 
-// Most Wanted (2005) for PC exists as 1.2 (retail) and 1.3 (EA's last patch). The patch
-// changes speed.exe and five data files; GLOBAL/GAMEPLAY.BIN tells the two apart, and
-// no mod in the set we install touches it.
-constexpr const char *kMostWantedFolders[] = {"CARS",      "FRONTEND", "GLOBAL", "LANGUAGES",
-                                              "MOVIES",    "NIS",      "SOUND",  "TRACKS"};
-constexpr const char *kMostWantedFiles[] = {"speed.exe", "GLOBAL/GAMEPLAY.BIN",
-                                            "GLOBAL/INGAMEB.BUN", "FRONTEND/FRONTB.LZC"};
-constexpr Release kMostWantedReleases[] = {
-    {"1.3", 2105216, 0xc5153d5a, false},
-    {"1.2", 2103680, 0x91a3ddf1, true},
+// Blur (2010) for PC: one release, 1.2. The exe is never checked (any DRM-free exe is
+// accepted); cache/root.pak tells a known copy, and an unknown one is installed with a warning.
+constexpr const char *kBlurFolders[] = {"cache", "levels", "UI"};
+constexpr const char *kBlurFiles[] = {"Blur.exe", "binkw32.dll", "cache/root.pak",
+                                      "cache/gamedata.pak", "cache/boot.pak"};
+constexpr Release kBlurReleases[] = {
+    {"1.2", 559652864, 0x1deb5c87, false},
 };
-// What mod installs leave in the game's folder: the ASI loader and its plugins.
-constexpr const char *kAsiLoaderFiles[] = {"scripts", "dinput8.dll", "d3d9.dll", "dsound.dll"};
-constexpr Manifest kMostWanted{"NFSMW",        kMostWantedFolders,  kMostWantedFiles,
-                               "GLOBAL/GAMEPLAY.BIN", kMostWantedReleases, kAsiLoaderFiles};
+constexpr const char *kBlurModFiles[] = {"scripts", "amax", "dinput8.dll", "d3d9.dll", "dsound.dll"};
+constexpr Manifest kBlur = []
+{
+    Manifest m{"BLUR", kBlurFolders, kBlurFiles, "cache/root.pak", kBlurReleases, kBlurModFiles};
+    m.mods_left_out = true;
+    m.accept_unknown = true;
+    return m;
+}();
 
-constexpr const Manifest *kManifests[] = {&kMostWanted};
+constexpr const Manifest *kManifests[] = {&kBlur};
 
 // ---- files ----------------------------------------------------------------------
 
@@ -143,7 +144,10 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
     for (const auto *name : manifest.mod_files)
         if (!find_entry(folder, name).empty())
             mods.emplace_back(name);
-    if (!mods.empty())
+    std::string left; // what the page adds about mods that are left out
+    if (!mods.empty() && manifest.mods_left_out)
+        left = " Mods found (" + join(mods) + ") are left out: the install adds its own.";
+    else if (!mods.empty())
     {
         result.state = State::modified;
         result.detail = "Mods are installed in it (" + join(mods) +
@@ -168,8 +172,18 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
                                 ? "Version " + result.version + ": upgraded to " +
                                       manifest.releases.front().version + " as it installs."
                                 : "Version " + result.version + ".";
+            result.detail += left;
             return result;
         }
+    if (manifest.accept_unknown)
+    {
+        result.state = State::ready;
+        result.version = manifest.releases.front().version;
+        result.warning = std::string(manifest.version_file) +
+                         " is not the one we know: installing anyway.";
+        result.detail = "Version " + result.version + " (unchecked)." + left;
+        return result;
+    }
     result.state = State::unknown;
     result.detail = std::string(manifest.version_file) +
                     " matches no release we know: the copy is modified, or it is a release we "
