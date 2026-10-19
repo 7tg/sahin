@@ -1,0 +1,712 @@
+{
+ "files": [
+  {
+   "path": "UI/movies/01_Career.bik",
+   "size": 79782988,
+   "crc32": "3cf028b6",
+   "sha256": "3190b6bcbd8985ef59048b0837a50c23b5e7bf2e7a9af39a016af4b740de19ec"
+  },
+  {
+   "path": "UI/movies/02_AdvancedTactics_1.bik",
+   "size": 111704704,
+   "crc32": "77d77980",
+   "sha256": "1419f93ff167fe1c9f2ce174475c827b5ac6310d92d967135d4e244c891f93ba"
+  },
+  {
+   "path": "UI/movies/03_Fan_Demands.bik",
+   "size": 45699120,
+   "crc32": "71b81607",
+   "sha256": "32203f5ea8264aa384721bd9976d699004bcbd98479e25ca0034686a6bac7a9a"
+  },
+  {
+   "path": "UI/movies/04_FanTarget.bik",
+   "size": 31988856,
+   "crc32": "6a25fc57",
+   "sha256": "8460f4a9e80748e9f38d63e8c775caa68a0ecc236a384e563e5017153102a495"
+  },
+  {
+   "path": "UI/movies/05_Fan_Run.bik",
+   "size": 34017044,
+   "crc32": "f308c9de",
+   "sha256": "2ccbfef52ba134f27de044a0387fa70f2ca5bfcacbe6f9f805c425a6f38999a2"
+  },
+  {
+   "path": "UI/movies/06_Race.bik",
+   "size": 55782240,
+   "crc32": "c47f0bc6",
+   "sha256": "5203f1c4208e556ae14d9f651e48ec757e0d2a7b2357ad58c6a14f6569832450"
+  },
+  {
+   "path": "UI/movies/07_Power_Up_Basics.bik",
+   "size": 129320284,
+   "crc32": "1e6fdb3e",
+   "sha256": "5d7c16ae8cc5d994987e10d058ef14b12659e2557529d4c7799a8271a59700e2"
+  },
+  {
+   "path": "UI/movies/08_Destruction.bik",
+   "size": 59664632,
+   "crc32": "f64fa856",
+   "sha256": "81d77e8b3bba4b3fc52881e19915ac327521b8745ffc2f9e9f93803043b4ca89"
+  },
+  {
+   "path": "UI/movies/09_Checkpoint.bik",
+   "size": 64554212,
+   "crc32": "eb98e43a",
+   "sha256": "3771aacc46e02715e91eeee68c4c33b73f1478af1706b64af28b71c31eec2680"
+  },
+  {
+   "path": "UI/movies/10_One_on_One.bik",
+   "size": 55384464,
+   "crc32": "268e4494",
+   "sha256": "0b4277d84d50b764f76e988c22cb85e0a2541b9e565c3890815a2b77a1657d40"
+  },
+  {
+   "path": "UI/movies/BizarreSplash.bik",
+   "size": 5669248,
+   "crc32": "ceb49821",
+   "sha256": "f2ddbca31c898ee890112da39f6b78c28157e29e2e8cf6d2037171569ee8822c"
+  },
+  {
+   "path": "UI/movies/BlurAttract.bik",
+   "size": 112311932,
+   "crc32": "bd64f4ff",
+   "sha256": "246cdf59c021ec27e3e2f107ddc7732ca36aaef0a057d257d7c7aa1d341888f0"
+  },
+  {
+   "path": "UI/movies/Credits.bik",
+   "size": 248115088,
+   "crc32": "9ff377ab",
+   "sha256": "c751176726b7aee1ae178c75c49f87099019e65b0ddd851336b224cd553c5a10"
+  },
+  {
+   "path": "UI/movies/Defeat_Ayumi-Harumi.bik",
+   "size": 14868136,
+   "crc32": "b457246e",
+   "sha256": "9cd6882988ae75f016a4e53b8f5aaec56a2d3f8db4b050f9e437029ee627226b"
+  },
+  {
+   "path": "UI/movies/Defeat_Carver.bik",
+   "size": 12529356,
+   "crc32": "863b38b8",
+   "sha256": "9d3304e9b18c800ce20460df874384b5e06ce847fa6ad93a4507f0d354ea0833"
+  },
+  {
+   "path": "UI/movies/Defeat_Drayke.bik",
+   "size": 15001312,
+   "crc32": "a51f3448",
+   "sha256": "d57dfb36fcd40859f9e51aa2ab85fb699e8e5b8ec2f3ba19b1c3978b23934a75"
+  },
+  {
+   "path": "UI/movies/Defeat_Evil-Shannon.bik",
+   "size": 21069588,
+   "crc32": "21c17218",
+   "sha256": "5c882ff2fdea8e889fb2bda17a006db6a302e26dacfb5e5bd525e370cf698749"
+  },
+  {
+   "path": "UI/movies/Defeat_Khan.bik",
+   "size": 16772128,
+   "crc32": "c8b4e82b",
+   "sha256": "0ce0ccc24428452e86cdfec697ec4985c792ab513edab5fa8c837917a433c3e1"
+  },
+  {
+   "path": "UI/movies/Defeat_Natalya.bik",
+   "size": 15949020,
+   "crc32": "8b9a1400",
+   "sha256": "72e6b98addd907db081b19ff1306046826d56087eaa1c11c7d0b3a17bbd10dae"
+  },
+  {
+   "path": "UI/movies/Defeat_Rhymer.bik",
+   "size": 17072816,
+   "crc32": "180e4cf4",
+   "sha256": "bf6c22c684c2c543264254cf0fa47978ea3aa41d83accc3a7afb4a5baad03169"
+  },
+  {
+   "path": "UI/movies/Defeat_Shannon.bik",
+   "size": 15709036,
+   "crc32": "b1a3b89a",
+   "sha256": "1cc419c8dc841f5fc33fed85a8b54c342cf5677d04f0627c5806508bb89aa0b0"
+  },
+  {
+   "path": "UI/movies/Defeat_Talon.bik",
+   "size": 16501992,
+   "crc32": "fd7971e7",
+   "sha256": "20658adb1854a1fb2d516b77e8ce308f43f8093b3dad16f20d687ca984a60911"
+  },
+  {
+   "path": "UI/movies/TUL_Ayumi-Harumi.bik",
+   "size": 19408628,
+   "crc32": "1caf3feb",
+   "sha256": "2f235637ccc8ac00bc4170ecfe36da328bbd0f35ce4801fed2c3a7a6d4794890"
+  },
+  {
+   "path": "UI/movies/TUL_Carver.bik",
+   "size": 21003472,
+   "crc32": "211c3162",
+   "sha256": "34f472120fb2ed30c2e2e50b8f85038c1c87c509faa050c4de998b2f342df5c0"
+  },
+  {
+   "path": "UI/movies/TUL_Drayke.bik",
+   "size": 21527512,
+   "crc32": "6f9c0fd4",
+   "sha256": "1b504f0d71080a6e21f4631054090da781984ab2dff04322f16ced38993e7ef7"
+  },
+  {
+   "path": "UI/movies/TUL_Evil-Shannon.bik",
+   "size": 24198680,
+   "crc32": "983d23b1",
+   "sha256": "d9df50d710733e5593b9eb350c2b439b59244dd2e8cbe1f1f2585f397ed266c0"
+  },
+  {
+   "path": "UI/movies/TUL_Khan.bik",
+   "size": 19521428,
+   "crc32": "7a728bfa",
+   "sha256": "bae0291236e454f00ececd84af40167a59315514cff521a2cb3e2fc4b4003825"
+  },
+  {
+   "path": "UI/movies/TUL_Natalya.bik",
+   "size": 24253440,
+   "crc32": "031bf5b3",
+   "sha256": "43ab42f5c095c7ca9b4a33a3d6bc04dd4e901047dacaf79e1cd6dbba39bb7e91"
+  },
+  {
+   "path": "UI/movies/TUL_Ryhmer.bik",
+   "size": 22992192,
+   "crc32": "23360ec9",
+   "sha256": "ebd61eb68c2cbfb0076c279cb728dc8d54e87034a37d2ad4a5d3043e56545c1d"
+  },
+  {
+   "path": "UI/movies/TUL_Talon.bik",
+   "size": 23811496,
+   "crc32": "e3ff7e5c",
+   "sha256": "e143d47e60f7b007977b9d1392858915b417880dfbc747d7059313a49deb0583"
+  },
+  {
+   "path": "UI/movies/atvi.bik",
+   "size": 7284912,
+   "crc32": "8b05d639",
+   "sha256": "62eda0e9a2dc57a75e9ff85507b6617cc585b71490636e0a305b3bfe1bb26b4d"
+  },
+  {
+   "path": "binkw32.dll",
+   "size": 174080,
+   "crc32": "f99a1349",
+   "sha256": "ad55ec64a893f233ac648ac974562f53736003b17bfd14527e66b3ffc8c2cdcb"
+  },
+  {
+   "path": "cache/boot.pak",
+   "size": 72953856,
+   "crc32": "25e73f2f",
+   "sha256": "29822d286846b6335bab0d9ff5ac1f5481cba3ff5b68924e8397453047f2a8b2"
+  },
+  {
+   "path": "cache/gamedata.pak",
+   "size": 22855680,
+   "crc32": "54eb9261",
+   "sha256": "07653df9f01b2865cb0081131ee97f7dc8393f723a142c30e6337b7862368a2e"
+  },
+  {
+   "path": "cache/gamedata.sig",
+   "size": 128,
+   "crc32": "cbc086a4",
+   "sha256": "a0dd34e70688a189b96c777c00480b51a650e83706e1c2521021021dcf054666"
+  },
+  {
+   "path": "cache/gamedata_boot.pak",
+   "size": 1878016,
+   "crc32": "a5dd2035",
+   "sha256": "e609cf6af136eb345e83c8737acb3a3f0bf3df123c8fd4aec323e7c0fedc5e72"
+  },
+  {
+   "path": "cache/gamedata_boot.sig",
+   "size": 128,
+   "crc32": "1d780a64",
+   "sha256": "cef0671939df63e4555d7aebd83969a3e81750e65959c577289267403f9d2c7a"
+  },
+  {
+   "path": "cache/lut_rampak.pak",
+   "size": 409600,
+   "crc32": "51ce0ae6",
+   "sha256": "ab944e90d84c262684192ee0fd5bb70a5c6a6a441a6ea1305bff79fb8cb3a4ed"
+  },
+  {
+   "path": "cache/root.pak",
+   "size": 559652864,
+   "crc32": "1deb5c87",
+   "sha256": "10a60bd58a619aa7dc7d726febf145a0f28a30cd82fce0fade848fa24e83184f"
+  },
+  {
+   "path": "cache/root_streaming.pak",
+   "size": 586088448,
+   "crc32": "2fd58f9f",
+   "sha256": "26f3ae66805c901852c6aa05ed6967a3f8e26cafc102ddf3fcfa78a3a32a728f"
+  },
+  {
+   "path": "cache/shaders-speed.pak",
+   "size": 6309888,
+   "crc32": "6d603647",
+   "sha256": "a8b8c509a0a9dbad6d380d1eb9f5e8c515974d9092901a2ec06808a607265a0e"
+  },
+  {
+   "path": "english.txt",
+   "size": 114,
+   "crc32": "53b36ebc",
+   "sha256": "f1763a37e47a5289273531972af2dc2af2f95e3761852ba6ca0947d44f34c896"
+  },
+  {
+   "path": "levels/jpn_mharuna/Level.level",
+   "size": 1232,
+   "crc32": "6abeb2b7",
+   "sha256": "d208b94e2b66fade23ff9eb5c2bcc009819b10a6ab929d046ba608e16b262293"
+  },
+  {
+   "path": "levels/jpn_mharuna/Level.levelphysics",
+   "size": 3542863,
+   "crc32": "534416d7",
+   "sha256": "c47d71aadc45f6c1e568c32054398e65f5341e7e0c69d70f91a85e967da87612"
+  },
+  {
+   "path": "levels/jpn_mharuna/Level.levelrender",
+   "size": 7434653,
+   "crc32": "159c161c",
+   "sha256": "1b6e957711572a5d4fbfcfd38562c53ea350776dbf2c3920483936461954d001"
+  },
+  {
+   "path": "levels/jpn_mharuna/Level.levelstream",
+   "size": 307269632,
+   "crc32": "1dced53a",
+   "sha256": "5ab6cb30d127945a8c6b2f4156dbce61b425f2908d71d21f94e400a22081c2da"
+  },
+  {
+   "path": "levels/jpn_tokyo_shutoko/Level.level",
+   "size": 3541,
+   "crc32": "fadaec3e",
+   "sha256": "aa206ecbe470867474f9244a5311e56347bd5f79f53fd93bc998f3d3a4146ef4"
+  },
+  {
+   "path": "levels/jpn_tokyo_shutoko/Level.levelphysics",
+   "size": 3150265,
+   "crc32": "0afadb98",
+   "sha256": "5604766d7d3f2928ff59d9f1edd9aa1e7c128f468c0b76fd6a642131c7947ce4"
+  },
+  {
+   "path": "levels/jpn_tokyo_shutoko/Level.levelrender",
+   "size": 9938004,
+   "crc32": "4d29281c",
+   "sha256": "0b7cad58596ea7d1b63755f3f69a05e6c72e9986e2e5397c61556e79cfbb913d"
+  },
+  {
+   "path": "levels/jpn_tokyo_shutoko/Level.levelstream",
+   "size": 240121856,
+   "crc32": "75cf9955",
+   "sha256": "ff48d7fa7522a4aefe0c77ba0527b2038e541fbc16ebd458abe07ea57b81bc43"
+  },
+  {
+   "path": "levels/showroom/level.level",
+   "size": 611,
+   "crc32": "f40b9928",
+   "sha256": "07c4c32d3ce823e185f004b774b6dfb9b0c519d71578cac37caae479d059b727"
+  },
+  {
+   "path": "levels/showroom/level.levelphysics",
+   "size": 158443,
+   "crc32": "aaf5de41",
+   "sha256": "a93c2cd5485ecbea21551053445a2d53364ef034f24ee51c5f2cb73f309f1f0c"
+  },
+  {
+   "path": "levels/showroom/level.levelrender",
+   "size": 978033,
+   "crc32": "5544f429",
+   "sha256": "4cad04c7b1772bc6375da04ffbb39d09ff1f429a8c2266c42ba2c318aba26b14"
+  },
+  {
+   "path": "levels/showroom/level.levelstream",
+   "size": 24725504,
+   "crc32": "1b41da38",
+   "sha256": "7c0d17eb35c3a0969f7903a97fc478cf7ddb6c88d562d4f8da985c36c24541ee"
+  },
+  {
+   "path": "levels/spa_barcelona_bowl_multiplayer/level.level",
+   "size": 994,
+   "crc32": "1e636563",
+   "sha256": "c05236661e449add70475cbf89fabd7b934d491f63b188761752fc5b61785828"
+  },
+  {
+   "path": "levels/spa_barcelona_bowl_multiplayer/level.levelphysics",
+   "size": 184397,
+   "crc32": "68382a07",
+   "sha256": "97c800d581d43aed11530b667becee08d5e2b8758308407a27b1aa161b41f10e"
+  },
+  {
+   "path": "levels/spa_barcelona_bowl_multiplayer/level.levelrender",
+   "size": 962088,
+   "crc32": "7cb62e0a",
+   "sha256": "ce957faec87cf03f91168c589996190936abcef776d332efc2e784b6f7f06c12"
+  },
+  {
+   "path": "levels/spa_barcelona_bowl_multiplayer/level.levelstream",
+   "size": 85737472,
+   "crc32": "67202fbd",
+   "sha256": "a09214d6c70c2756e98f9032d69ff2c1159c6ac7a72151464bd5415759caca71"
+  },
+  {
+   "path": "levels/spa_barcelona_gracia/Level.level",
+   "size": 996,
+   "crc32": "59b30aed",
+   "sha256": "96cf0d8060c42a450a93ba9afcf4f1e0e1fb848c795ee009e46ccef4dab53bc7"
+  },
+  {
+   "path": "levels/spa_barcelona_gracia/Level.levelphysics",
+   "size": 5569121,
+   "crc32": "e43f5e30",
+   "sha256": "acfb58a20ff7adced0b2424dc39474509e6b4c4c805729fd9463bdd310a173c0"
+  },
+  {
+   "path": "levels/spa_barcelona_gracia/Level.levelrender",
+   "size": 9095776,
+   "crc32": "2d7d703c",
+   "sha256": "4eb86ff62ecdb4bf0804e19da4641a1b9d3e8e45b46bc76e5fe1204370d95176"
+  },
+  {
+   "path": "levels/spa_barcelona_gracia/Level.levelstream",
+   "size": 489828352,
+   "crc32": "04e42cfa",
+   "sha256": "384697f6d8ff889a726c5d8ba2c8a84a6e209835ed34ecac3dc5980b9a7fa341"
+  },
+  {
+   "path": "levels/spa_barcelona_oval/Level.level",
+   "size": 6884,
+   "crc32": "c677229f",
+   "sha256": "67606b48fffdd8127c62ad0dec9d748efad777c432ff3f7cf1cb1d4182906184"
+  },
+  {
+   "path": "levels/spa_barcelona_oval/Level.levelphysics",
+   "size": 3260059,
+   "crc32": "6067d83a",
+   "sha256": "43a3a044e803e8e864032949db7d32bc5f7f4f93201384a46c59632d7b744f46"
+  },
+  {
+   "path": "levels/spa_barcelona_oval/Level.levelrender",
+   "size": 5677660,
+   "crc32": "6d30c39d",
+   "sha256": "a12fb250ee21530130a4b0f28f80f73ce3b53bd67f163e7e49fbf769e89fed51"
+  },
+  {
+   "path": "levels/spa_barcelona_oval/Level.levelstream",
+   "size": 214781952,
+   "crc32": "1a63e3ea",
+   "sha256": "8218e4dfd1120a8638555708d0c09e8e2642dad9b3c0e512f761f73a266d8b2b"
+  },
+  {
+   "path": "levels/uk_brighton/Level.level",
+   "size": 1803,
+   "crc32": "709d1d0b",
+   "sha256": "04edd812b65b161964c2312c9f0d046fdcc287449088ba5416ea0c9bbc969a3e"
+  },
+  {
+   "path": "levels/uk_brighton/Level.levelphysics",
+   "size": 5595906,
+   "crc32": "b96a085b",
+   "sha256": "147c362a98c9db90f2272e6f7834911eac0e265949bff840f520e5b690846e89"
+  },
+  {
+   "path": "levels/uk_brighton/Level.levelrender",
+   "size": 11730851,
+   "crc32": "e5251e12",
+   "sha256": "92fa238d927ff02ff1f76b0b5832fd79f6348d4084a4200982d997266f361e46"
+  },
+  {
+   "path": "levels/uk_brighton/Level.levelstream",
+   "size": 308273152,
+   "crc32": "6ffd9b17",
+   "sha256": "99cfa8c562ca67e247c5c146ba08842efc48006f26aa9fdd9dc384d5814d5b65"
+  },
+  {
+   "path": "levels/uk_london_hackney/Level.level",
+   "size": 15132,
+   "crc32": "6c9c2de6",
+   "sha256": "63f9b73bd56925c8bf7a98e1d55665d0f5f9f2df38ce610ce333d739c2c763a9"
+  },
+  {
+   "path": "levels/uk_london_hackney/Level.levelphysics",
+   "size": 4158979,
+   "crc32": "3926c2e3",
+   "sha256": "4b17abe9dce1efdf22543facec29d16a29617d054ccf1af3e182ddf487868acf"
+  },
+  {
+   "path": "levels/uk_london_hackney/Level.levelrender",
+   "size": 11081735,
+   "crc32": "7960919f",
+   "sha256": "d28c835f7fb49a6fab90cf47fd845a6a0b27c94d067f762c3627e3e12e75e975"
+  },
+  {
+   "path": "levels/uk_london_hackney/Level.levelstream",
+   "size": 288755712,
+   "crc32": "bd0ab06a",
+   "sha256": "37e1bd3d162473b1ff6529d340a37c66b31c35964876a94ef4aab23b8259259b"
+  },
+  {
+   "path": "levels/usa_amboy/Level.level",
+   "size": 1035,
+   "crc32": "d5ebbd32",
+   "sha256": "9b11ec0ded9afcf4d39a518781605043db40cfe0ece985ede46ba1001444d9b6"
+  },
+  {
+   "path": "levels/usa_amboy/Level.levelphysics",
+   "size": 4442528,
+   "crc32": "2c4bbac4",
+   "sha256": "18c73e1cca6f13c5bbd4937454f25ec3163a67553fea6842a7797400af2175f2"
+  },
+  {
+   "path": "levels/usa_amboy/Level.levelrender",
+   "size": 11263032,
+   "crc32": "9c748f2d",
+   "sha256": "796c9289e224a6c15aff75b929eca875ef03d4d91b015f67aba704de1f9a3ea7"
+  },
+  {
+   "path": "levels/usa_amboy/Level.levelstream",
+   "size": 331728896,
+   "crc32": "b8b27215",
+   "sha256": "09eb81f42879e1608fab3753de0bbbbb23c549c5098133ac1c31e40e0876c9e8"
+  },
+  {
+   "path": "levels/usa_amboy_multiplayer/level.level",
+   "size": 369054,
+   "crc32": "13964b4a",
+   "sha256": "f449df95811bf19dfcc7b36873b8f3028f33f2af12f5b0f3a0e4002f59dba760"
+  },
+  {
+   "path": "levels/usa_amboy_multiplayer/level.levelphysics",
+   "size": 1414477,
+   "crc32": "0a8ce09b",
+   "sha256": "44003637440f4b53f2396d2d64779599d0ccee02b5ff2cc430b815935736b25d"
+  },
+  {
+   "path": "levels/usa_amboy_multiplayer/level.levelrender",
+   "size": 13523432,
+   "crc32": "2074953f",
+   "sha256": "accd0c80d9e02f7e4bb7f96ae62b4e1b44975dcad8ff95db59061b7325a8219e"
+  },
+  {
+   "path": "levels/usa_amboy_multiplayer/level.levelstream",
+   "size": 105971712,
+   "crc32": "da36e74f",
+   "sha256": "8d9ed8548fc2bb496c1a75759205179631a6b0f2f70f8ac1c83d3cd810e861d6"
+  },
+  {
+   "path": "levels/usa_la_downtown/Level.level",
+   "size": 2034,
+   "crc32": "bac02128",
+   "sha256": "8de29ec160a03ee0c0b5bbbef9f7e4b0d12dc4f456cc24bea4014b1654cedb1c"
+  },
+  {
+   "path": "levels/usa_la_downtown/Level.levelphysics",
+   "size": 6637886,
+   "crc32": "e11c7b47",
+   "sha256": "06f2e5222dbb8cfcc8fe4493f62161fb11d64310a09603502484dee8040c9fd1"
+  },
+  {
+   "path": "levels/usa_la_downtown/Level.levelrender",
+   "size": 9796454,
+   "crc32": "a5a642af",
+   "sha256": "0e2f6e282fa3d8de3bf19bee4a4f30b377067f08e2151745cb76e1085ed833ed"
+  },
+  {
+   "path": "levels/usa_la_downtown/Level.levelstream",
+   "size": 237907968,
+   "crc32": "d52e3b18",
+   "sha256": "29da820d30a19c4aef0f861a6d1efcebc94cae5715a97e6e2d397776cc29d5da"
+  },
+  {
+   "path": "levels/usa_la_downtown_multiplayer/level.level",
+   "size": 1968,
+   "crc32": "3deccba5",
+   "sha256": "d40e4d2444a8c60b01e9e6ecaf6b1e0f349feb1453500d6915d915eb7c011669"
+  },
+  {
+   "path": "levels/usa_la_downtown_multiplayer/level.levelphysics",
+   "size": 513843,
+   "crc32": "9d8b5c5f",
+   "sha256": "cf061ec616fca71feddabf8197f86080d73eb65957dce5be6b62588326b493ce"
+  },
+  {
+   "path": "levels/usa_la_downtown_multiplayer/level.levelrender",
+   "size": 1743524,
+   "crc32": "a70aada8",
+   "sha256": "cc78607e9dd73d04735f54653d09b11d5aa21cceff8aaadb334a5fc8e6c06703"
+  },
+  {
+   "path": "levels/usa_la_downtown_multiplayer/level.levelstream",
+   "size": 92147712,
+   "crc32": "604bc342",
+   "sha256": "96f476ce5ff867ea4fbe92156182787bf03f8cfb721e4cafe219cfb3f5e2bdb4"
+  },
+  {
+   "path": "levels/usa_la_longbeachdocks/Level.level",
+   "size": 922,
+   "crc32": "465302d3",
+   "sha256": "d5d4ee196f5bd568e8b5cc793e95f9ca285d06c071bca6adc9d0a668f4ba71aa"
+  },
+  {
+   "path": "levels/usa_la_longbeachdocks/Level.levelphysics",
+   "size": 2214990,
+   "crc32": "d2bcfb68",
+   "sha256": "ce22c1cadbcff96074ff4d84741137162d2fe0697a5c354053e181944d6cca0d"
+  },
+  {
+   "path": "levels/usa_la_longbeachdocks/Level.levelrender",
+   "size": 13319217,
+   "crc32": "98676f18",
+   "sha256": "edccd6e676a41008f2f6099ffadc7f004fbf02285218d0cd080b3353d692ac5a"
+  },
+  {
+   "path": "levels/usa_la_longbeachdocks/Level.levelstream",
+   "size": 232339456,
+   "crc32": "e8fbe975",
+   "sha256": "5cd242cc98270e6f8ae40379a6a3e0cff63c68ba5ae728ced4f938baf7364cac"
+  },
+  {
+   "path": "levels/usa_la_multiplayer_highrise/level.level",
+   "size": 87572,
+   "crc32": "a9da4e44",
+   "sha256": "f92a9038a7a1211c0d50af39f82f1ac8e2ec8104bb7676b1d3bb296c2f008fdd"
+  },
+  {
+   "path": "levels/usa_la_multiplayer_highrise/level.levelphysics",
+   "size": 136451,
+   "crc32": "fa2e030c",
+   "sha256": "de95aca0edf1b89b0168860bcf733def41e1874b721a853de69f5e675f156703"
+  },
+  {
+   "path": "levels/usa_la_multiplayer_highrise/level.levelrender",
+   "size": 1963904,
+   "crc32": "5aa03991",
+   "sha256": "8ed80473acc4bc64b6b1ae866b0ede3f8e94e54da4554df94d66fc83ff39e5be"
+  },
+  {
+   "path": "levels/usa_la_multiplayer_highrise/level.levelstream",
+   "size": 45817856,
+   "crc32": "f8997387",
+   "sha256": "4145079a53df6ad7c49c9441da0f567b7c7c05fc12681dbfd649bf182926134c"
+  },
+  {
+   "path": "levels/usa_la_observatory/Level.level",
+   "size": 611,
+   "crc32": "7997e21a",
+   "sha256": "a3720d4a51e149a6043e04be166c584f39dd65ef457fbaaddc3f9ae198ed6189"
+  },
+  {
+   "path": "levels/usa_la_observatory/Level.levelphysics",
+   "size": 4715868,
+   "crc32": "bfb345ab",
+   "sha256": "070874eedc63eac99f9a586b3581c2b8c9d396a433b7ee0bc4e3e16663c034d6"
+  },
+  {
+   "path": "levels/usa_la_observatory/Level.levelrender",
+   "size": 7113135,
+   "crc32": "92922274",
+   "sha256": "b84a30913d25ef3355d9cbefec720e31896966240b07d2ee80b1f61ec750f3fe"
+  },
+  {
+   "path": "levels/usa_la_observatory/Level.levelstream",
+   "size": 189837312,
+   "crc32": "82d6e47f",
+   "sha256": "8957a3cd8e46c7d77893460ee3ab24ccc0a344c45c4d5eb4b2d6b204b249f645"
+  },
+  {
+   "path": "levels/usa_la_river/Level.level",
+   "size": 818,
+   "crc32": "06088134",
+   "sha256": "80e187809efbfb9752fc24dfcef9b695b7be72130caaf3e438af36bb51afe411"
+  },
+  {
+   "path": "levels/usa_la_river/Level.levelphysics",
+   "size": 1945409,
+   "crc32": "4b01bac9",
+   "sha256": "1e678b2dff61b6d3a3d5d95a5160c3f713290251667cb27c55e262175efe4e28"
+  },
+  {
+   "path": "levels/usa_la_river/Level.levelrender",
+   "size": 9873988,
+   "crc32": "ef452f02",
+   "sha256": "0408e434e5c7f28e5c8f873fac7b33832daf0de29ae404e8a4205433a8b557f9"
+  },
+  {
+   "path": "levels/usa_la_river/Level.levelstream",
+   "size": 244682752,
+   "crc32": "90b821bd",
+   "sha256": "c6b1485cb4164f6ef38ac129d553f7ce60b006ff751dc3889a9eff0c683b33e9"
+  },
+  {
+   "path": "levels/usa_ny_dumbo/Level.level",
+   "size": 18687,
+   "crc32": "62102c50",
+   "sha256": "fdfeb4a37e4ec32bcbd5e767986d267b58404a472f5888fb7c9db8a2d11a5fa3"
+  },
+  {
+   "path": "levels/usa_ny_dumbo/Level.levelphysics",
+   "size": 3670228,
+   "crc32": "3c8d1dd9",
+   "sha256": "2022e8d1ea89b6cdc1d541866987af2d49da863b1f187aa92e05a9c11b555994"
+  },
+  {
+   "path": "levels/usa_ny_dumbo/Level.levelrender",
+   "size": 9033374,
+   "crc32": "347e5ff4",
+   "sha256": "52e84387cb1ad488595d2f9afe653b44adf0b2ecf8e49a3cd1c5faead215cc72"
+  },
+  {
+   "path": "levels/usa_ny_dumbo/Level.levelstream",
+   "size": 565352448,
+   "crc32": "164b9941",
+   "sha256": "5cb0dbf96a0955e6cf9bf3dac141e11ca91a6c7cb97b371af6dd28aca3a69519"
+  },
+  {
+   "path": "levels/usa_sanfran_russianhill/Level.level",
+   "size": 2187,
+   "crc32": "6b344f02",
+   "sha256": "a028effee1508ece99cadfc23a7776d56fe0eb382ebd451481bb940f77b2af82"
+  },
+  {
+   "path": "levels/usa_sanfran_russianhill/Level.levelphysics",
+   "size": 1513282,
+   "crc32": "5398e818",
+   "sha256": "35d414925567731f95dea1ef72598be41c2484c630ca3b83cb3b72d9d736504a"
+  },
+  {
+   "path": "levels/usa_sanfran_russianhill/Level.levelrender",
+   "size": 5135398,
+   "crc32": "de3f9a8d",
+   "sha256": "df3c936a888f42e702230f6debba7c58fc7a3e2e86dad59624e5ea342c6ddc66"
+  },
+  {
+   "path": "levels/usa_sanfran_russianhill/Level.levelstream",
+   "size": 651393024,
+   "crc32": "dede5061",
+   "sha256": "4faa767941ae637637ad3d6465b0c0b7e4455c33858685d05fcd50ddcd4811ac"
+  },
+  {
+   "path": "levels/usa_sanfran_sausalito/Level.level",
+   "size": 23276,
+   "crc32": "41f0b789",
+   "sha256": "922b7d7cc0ad40df2074823792940fdcc77bc7b0b64759adf8a88ab1d9412102"
+  },
+  {
+   "path": "levels/usa_sanfran_sausalito/Level.levelphysics",
+   "size": 5836796,
+   "crc32": "cea2ec1b",
+   "sha256": "d4e1074b8f83b924af92060b18e9ca3e36ad48e10e0276a2b7f70c5cdc7b7c65"
+  },
+  {
+   "path": "levels/usa_sanfran_sausalito/Level.levelrender",
+   "size": 13687680,
+   "crc32": "ab3672c6",
+   "sha256": "afcce74a093597f5ba725b26e792cc959dbc113b735e61a3c5a09ccf8825bdaf"
+  },
+  {
+   "path": "levels/usa_sanfran_sausalito/Level.levelstream",
+   "size": 320681984,
+   "crc32": "1e8721de",
+   "sha256": "c6d53e31e63f37cb33a93ac2d0299abc3fb198646e39ce496f345d3738292b8c"
+  }
+ ]
+}
