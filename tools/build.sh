@@ -68,7 +68,9 @@ checkout() { # source dir commit
 checkout /src/sahin /w/sahin \"\$REV\"
 cd /w/sahin
 # The submodules, from the working copy's own clones: each cloned once at its gitlink commit
-# (again only when that commit is new to it); the setup step makes its patched branch.
+# (again only when that commit is new to it); the setup step makes its patched branch. Not
+# checked out again otherwise: that would leave prospero-win, PS5_Mesa and PS5_Vulkan on their
+# unpatched gitlink commits for a run without the setup step.
 for sub in prospero-win PS5_Mesa PS5_Vulkan PS5_PayloadSDK ps5-native-app-boilerplate ps5-opengl; do
     sha=\$(git ls-tree HEAD \$sub | awk '{print \$3}')
     [[ -d \$sub/.git ]] && git -C \$sub cat-file -e \"\$sha^{commit}\" 2>/dev/null && continue
@@ -148,7 +150,9 @@ fi
 
 # The outputs, and their hashes.
 out='PPSA99995 apps PPSA99404 PPSA99404.zip bare-prefix-sahin.zip '\$(cd release && ls ps5-opengl-sdk-*.tar.gz 2>/dev/null || true)
-for o in \$out SHA256SUMS; do rm -rf /out/\$o; [[ ! -e release/\$o ]] || cp -a release/\$o /out/; done
+# Only what the volume has replaces release/: an output it lacks (a partial run on a fresh
+# volume) is left as it was, and hashed with the rest.
+for o in \$out; do [[ ! -e release/\$o ]] || { rm -rf /out/\$o; cp -a release/\$o /out/; }; done
 cd /out
 for o in \$out; do if [[ -e \$o ]]; then find ./\$o -type f -print0; fi; done | sort -z | xargs -0 -r sha256sum > SHA256SUMS
 chown -R \"\$OWNER\" \$out SHA256SUMS 2>/dev/null || true
