@@ -131,6 +131,9 @@ class Service
     std::string settings_file;
     bool cancel_job(const std::string &id);
     bool job(JobView &view);
+    // True once nothing is queued or under way and no settings wait to be written (the
+    // installer and the settings file have caught up); false too while its lock is busy.
+    bool settled();
     // The titles running now, refreshed every two seconds by the installer's
     // worker. known is false while the console's sandbox folder can't be listed.
     bool running(std::vector<std::string> &ids, bool &known);
@@ -198,6 +201,7 @@ class Service
     std::string frame_report_;
     std::string settings_;
     bool settings_pending_ = false;
+    bool settings_saving_ = false; // taken by the worker, not yet written
     // The base copies last published, by title ID; checked again every few seconds, and at
     // once after an import.
     std::map<std::string, library::BaseGame> bases_;

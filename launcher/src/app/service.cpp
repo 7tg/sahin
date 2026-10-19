@@ -968,6 +968,13 @@ bool Service::job(JobView &view)
     return true;
 }
 
+bool Service::settled()
+{
+    std::unique_lock lock(mutex_, std::try_to_lock);
+    return lock.owns_lock() && jobs_.empty() && job_id_.empty() && !settings_pending_ &&
+           !settings_saving_;
+}
+
 bool Service::running(std::vector<std::string> &ids, bool &known)
 {
     std::unique_lock lock(mutex_, std::try_to_lock);
@@ -1380,7 +1387,7 @@ void Service::run()
             {
                 settings.swap(settings_);
                 settings_pending_ = false;
-                save = true;
+                settings_saving_ = save = true;
             }
         }
         if (save)
@@ -1398,6 +1405,8 @@ void Service::run()
                 notice.detail = error;
                 publish(std::move(notice));
             }
+            std::lock_guard lock(mutex_);
+            settings_saving_ = false;
         }
         if (!id.empty())
         {

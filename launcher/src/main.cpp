@@ -811,9 +811,21 @@ int main()
         // The page's request goes to the installer; one refused by a busy lock is asked again.
         if (auto &order = screen.pending_order; order.kind == store::Order::Kind::play)
         {
-            // Settings changed this frame are written first; then the game takes the title.
-            if (screen.settings_changed)
-                service.save_settings(store::format_settings(screen.settings()));
+            // Changed settings are written first, and a settings job queued just before (the
+            // game's profile and ini files) is let finish; then the game takes the title. Ten
+            // seconds at most: a stuck worker doesn't keep the game from starting.
+            const std::int64_t asked_us = sys::monotonic_us();
+            const auto waited_ms = [asked_us]
+            { return static_cast<long long>((sys::monotonic_us() - asked_us) / 1000); };
+            while (screen.settings_changed &&
+                   !service.save_settings(store::format_settings(screen.settings())) &&
+                   waited_ms() < 10000)
+                sys::sleep_us(5000);
+            while (!service.settled() && waited_ms() < 10000)
+                sys::sleep_us(20000);
+            if (!service.settled())
+                sys::log("[STORE] play: the installer is still busy after %lld ms; starting anyway",
+                         waited_ms());
             play_single_game("play");
         }
         if (auto &order = screen.pending_order; order.kind != store::Order::Kind::none)

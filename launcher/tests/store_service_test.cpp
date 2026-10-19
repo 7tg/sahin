@@ -139,6 +139,7 @@ static void check_installer()
         std::this_thread::sleep_for(1ms);
     assert(view.id == id && view.phase == store::install::Phase::downloading);
     assert(view.done == artifact.size() / 2 && view.total == artifact.size());
+    assert(!service.settled()); // Play waits for this job
     ask([&] { return service.cancel_job(id); });
     auto done = next(service, store::Update::Kind::job);
     assert(!done.ok && done.entry.id == id && done.message == "Example: cancelled");
@@ -156,6 +157,8 @@ static void check_installer()
     assert(!done.ok && done.detail.find("running") != std::string::npos);
     assert(fs::exists(root / "apps" / id / "eboot.bin"));
     assert(service.job(view) && view.id.empty() && view.waiting.empty());
+    ask([&] { return service.settled(); });
+    assert(service.settled());
     service.stop();
     fs::remove_all(root);
 }
@@ -198,9 +201,13 @@ int main()
     assert(sandboxed.start());
     while (!sandboxed.save_settings("debug=1\n"))
         std::this_thread::sleep_for(1ms);
-    sandboxed.stop();
+    // Settled only once the worker has written them (what Play waits for).
+    const auto written = std::chrono::steady_clock::now() + 5s;
+    while (!sandboxed.settled() && std::chrono::steady_clock::now() < written)
+        std::this_thread::sleep_for(1ms);
     saved.clear();
     assert(hui::save::read_file(root + "/sandboxed-settings.txt", &saved) && saved == "debug=1\n");
+    sandboxed.stop();
     std::filesystem::remove_all(root);
     check_installer();
 }
