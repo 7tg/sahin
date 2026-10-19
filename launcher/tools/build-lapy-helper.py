@@ -68,8 +68,10 @@ def fetch_lapy():
     staging = Path(tempfile.mkdtemp(prefix="lapy-git-", dir=CACHE))
     try:
         subprocess.run(["git", "init", "-q"], cwd=staging, check=True)
+        # The blackbearreloaded account is gone; the fork carries the pinned commit, which
+        # git checks by its hash.
         subprocess.run(["git", "remote", "add", "origin",
-                        "https://github.com/blackbearreloaded/PS5-Lapy-JB-Daemon.git"],
+                        "https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git"],
                        cwd=staging, check=True)
         subprocess.run(["git", "fetch", "-q", "--depth", "1", "origin", LAPY_COMMIT],
                        cwd=staging, check=True)
