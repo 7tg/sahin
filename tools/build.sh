@@ -113,6 +113,26 @@ if want game-app; then
     # The launcher's licences go in with the runner's: a separate licenses/ beside LICENSES/
     # is one folder on a case-insensitive disk (a player unzipping on Windows or a Mac).
     cp -a \$D/assets \$A/assets && cp -a \$D/licenses/. \$A/LICENSES/
+    # ps5-opengl, linked into eboot.bin: its licence and notices, from the SDK archive
+    # fetch-opengl-sdk.sh unpacked for this build.
+    o=\$L/.deps/ps5-opengl/\${sdk%.tar.gz}
+    mkdir -p \$A/LICENSES/ps5-opengl
+    cp -a \$o/LICENSE \$o/LICENSES \$o/THIRD_PARTY_NOTICES.md \$A/LICENSES/ps5-opengl/
+    # Our DXVK, in the bare prefix the bundle carries: its licence and those of the code built
+    # into its DLLs, from the source the dxvk step built.
+    x=.deps/dxvk-src
+    mkdir -p \$A/LICENSES/dxvk/dxbc-spirv \$A/LICENSES/dxvk/libdisplay-info \$A/LICENSES/dxvk/vulkan \$A/LICENSES/dxvk/spirv
+    cp \$x/LICENSE \$A/LICENSES/dxvk/
+    cp \$x/subprojects/dxbc-spirv/LICENSE \$A/LICENSES/dxvk/dxbc-spirv/
+    cp \$x/subprojects/libdisplay-info/LICENSE \$A/LICENSES/dxvk/libdisplay-info/
+    cp \$x/include/vulkan/LICENSE.md \$A/LICENSES/dxvk/vulkan/
+    cp \$x/include/spirv/LICENSE \$A/LICENSES/dxvk/spirv/
+    # The libraries in the launcher's own source tree (its network ones are in assets/licenses).
+    mkdir -p \$A/LICENSES/launcher
+    cp \$L/THIRD_PARTY_NOTICES.md \$A/LICENSES/launcher/
+    for t in miniz/LICENSE monocypher/LICENCE.md picosha2/LICENSE stb/LICENSE yyjson/LICENSE; do
+        cp \$L/src/third_party/\$t \$A/LICENSES/launcher/\${t%%/*}-\${t##*/}
+    done
     python3 tools/make-app-zip.py \$A release/PPSA99404.zip
 fi
 if want audit; then
