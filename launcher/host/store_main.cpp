@@ -590,7 +590,7 @@ int main(int argc, char **argv)
                 {
                     // Further on: the game's files, the stages before it done.
                     screen.set_activity({"PPSA99404", 6, 1200u << 20, 3000u << 20, {}, 4,
-                                         {"On the console", "All 17 files ready", "Using the prefix pb-mw",
+                                         {"On the console", "All 17 files ready", "Using the prefix pb-blur",
                                           "Your copy and the mod files check out",
                                           "Copying your game into the prefix"}, 0.72f});
                     settle(60);

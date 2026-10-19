@@ -58,7 +58,9 @@ Upstream fixes to the NFS repos are applied by hand when they matter.
 5. The install record is written. After that the tile starts the game directly.
 6. If the game exits within its first seconds, the launcher says so on its next start and
    names the likely cause: a SecuROM `Blur.exe` (the retail one), which does not run under
-   Wine.
+   Wine. (Before handing over, the launcher writes a start record, then a return request for
+   the runner; the runner brings the launcher back when the game ends, and the record tells
+   an early exit from a game that ran.)
 
 ## 4. Mods
 
@@ -66,7 +68,7 @@ Upstream fixes to the NFS repos are applied by hand when they matter.
 | --- | --- | --- |
 | Ultimate ASI Loader v9.7.4 (ThirteenAG, MIT), its `dinput8.dll` installed as `dsound.dll` | GitHub release zip `952cebfc…5c5f` | on |
 | `amax-redirect.asi` (Aib0t), with an `amax-redirect.cfg` we write | GitHub release asset `dae2d6b0…9acd` | on (online) |
-| Amax client 0.0.0.7: d3d9 proxy, auth, Lua plugins incl. 60 fps race cap | `cs.amax-emu.com/amax_client_files.zip` `4ee93bc7…25c7`; DXVK's d3d9 placed as `amax\dxvk.dll` | off (option) |
+| Amax client 0.0.0.7: d3d9 proxy, auth, Lua plugins incl. 60 fps race cap | `cs.amax-emu.com/amax_client_files.zip` `4ee93bc7…25c7`; its d3d9 proxy falls back to C:\Windows\System32\d3d9.dll, which in the prefix is DXVK | off (option) |
 
 Not included: Discord RPC (no use on a PS5), Amax billboard ads (cosmetic), the FPS unlocker
 (physics are tied to frame rate; the game stays at its cap), widescreen/FOV fixes (none exist;
@@ -85,7 +87,7 @@ Holding □ while the tile starts opens Sahin's page instead of the game:
 - Repair install
 - Play
 
-Settings live in `/data/sahin/settings.json` and are applied (profile, registry, ini, files)
+Settings live in `/data/sahin/settings.txt` and are applied (profile, registry, ini, files)
 before the game starts. Toggling a mod option re-runs the file part of the install. In game,
 Options+Touchpad quits to Home (prospero-win patch 0023).
 

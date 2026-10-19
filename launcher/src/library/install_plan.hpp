@@ -106,7 +106,7 @@ struct InstallPlan
         bool rtpatch = false;
     };
     std::vector<Upgrade> upgrades;
-    // What the user may add at Install (MW's "Xbox 360 graphics"): each adds its files,
+    // What the user may add at Install (Blur's "Amax client extras"): each adds its files,
     // edits and expected hashes to the plan's, and its dll_overrides to the profile's.
     // Its sources are in the plan's list; only the chosen options' are fetched.
     struct Option
@@ -120,8 +120,8 @@ struct InstallPlan
         std::string dll_overrides; // appended to the profile's
     };
     std::vector<Option> options;
-    // Ini edits for the DualSense touchpad as the mouse ("touchpad": {"ini": [...]}; MW:
-    // XtendedInput draws its cursor), applied after the plan's own when it is chosen.
+    // Ini edits for the DualSense touchpad as the mouse ("touchpad": {"ini": [...]}; the game
+    // draws its own cursor), applied after the plan's own when it is chosen.
     std::vector<IniEdit> touchpad_ini;
 
     const Source *source(const std::string &id) const;

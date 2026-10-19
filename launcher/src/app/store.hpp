@@ -56,6 +56,7 @@ struct App
     bool base_known = false;
     bool game_installed = false; // installed into its prefix by Sahin
     std::vector<library::OptionView> game_options = {}; // what Install can add (the plan's)
+    library::Resolution game_resolution = {}; // the plan's picture size: the Resolution row's default
 };
 
 // What the page asks the installer to do. The frame loop hands it to the
@@ -158,7 +159,7 @@ class Screen
     void set_detail(const catalog::Entry &entry);
     void set_detail_error(const std::string &id, std::string message);
     void set_base(const std::string &id, library::BaseGame base, bool installed,
-                  std::vector<library::OptionView> options = {});
+                  std::vector<library::OptionView> options = {}, library::Resolution plan_size = {});
     void set_icon(const std::string &id, std::uint32_t texture);
     // The manager's emblem for the opening, the top bar and About: cut out (assets/logo.png,
     // drawn as it is) or the Home-screen icon (a tile, drawn with rounded corners).

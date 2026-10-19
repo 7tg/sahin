@@ -639,8 +639,8 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
                                       : 0.0);
                 if (status.names != shown && !status.names.empty())
                 {
-                    // "Getting Xbox 360 Stuff Pack 4.2 (3 of 14)", or with several at once
-                    // "Getting 3 files at once: Xbox 360 Stuff Pack 4.2, ... (12 of 14)".
+                    // "Getting Amax client 1.0 (3 of 14)", or with several at once
+                    // "Getting 3 files at once: Amax client 1.0, ... (12 of 14)".
                     shown = status.names;
                     std::string what = shown.front();
                     if (shown.size() > 1)
@@ -790,6 +790,7 @@ void Service::check_bases()
         auto found = library::locate(root_, roots, *manifest);
         bool installed = false;
         std::vector<library::OptionView> views;
+        library::Resolution plan_size;
         {
             library::InstallPlan plan;
             const library::Manifest *unused = nullptr;
@@ -803,7 +804,10 @@ void Service::check_bases()
                                    .c_str(),
                                F_OK) == 0;
             if (!plan.game.empty())
+            {
                 views = library::option_views(plan, {root_, win_root}, options);
+                plan_size = {plan.profile.width, plan.profile.height};
+            }
         }
         std::vector<std::string> on;
         for (const auto &view : views)
@@ -826,6 +830,7 @@ void Service::check_bases()
         update.base = std::move(found);
         update.game_installed = installed;
         update.game_options = std::move(views);
+        update.game_resolution = plan_size;
         publish(std::move(update));
     }
 }

@@ -50,6 +50,7 @@ struct Update
     library::BaseGame base;
     bool game_installed = false; // base: the game's install record is there
     std::vector<library::OptionView> game_options; // base: what Install can add, each on or off
+    library::Resolution game_resolution;           // base: the plan's picture size (0: none)
 };
 // What the installer is doing, for the frame that draws it.
 struct JobView

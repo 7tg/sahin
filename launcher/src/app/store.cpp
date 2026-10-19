@@ -613,7 +613,7 @@ void Screen::set_detail(const catalog::Entry &entry)
 }
 
 void Screen::set_base(const std::string &id, library::BaseGame base, bool installed,
-                      std::vector<library::OptionView> options)
+                      std::vector<library::OptionView> options, library::Resolution plan_size)
 {
     for (auto &app : apps_)
         if (app.title_id == id)
@@ -622,6 +622,7 @@ void Screen::set_base(const std::string &id, library::BaseGame base, bool instal
             app.base_known = true;
             app.game_installed = installed;
             app.game_options = options;
+            app.game_resolution = plan_size;
         }
     // A game's own app shows how to set it up until it is installed: kept current.
     if (!single_game_.empty() && page_app() && page_app()->title_id == id)
@@ -656,7 +657,6 @@ void Screen::refresh_detail()
         // A game's own app before its install: what a new player has to do, not a description.
         using library::State;
         const auto &base = app.base;
-        const std::string folder = base.path.substr(base.path.find_last_of('/') + 1);
         if ((base.state == State::ready || base.state == State::needs_patch) && base.on_usb)
             blocks.push_back(Block::paragraph(
                 "Your copy is on the USB drive. Pick the options on the right, then Install: your "
@@ -671,11 +671,8 @@ void Screen::refresh_detail()
             blocks.push_back(Block::paragraph(
                 "1. Install Blur, the PC game, on a computer. Leave it unmodded."));
             blocks.push_back(Block::paragraph(
-                "2. Copy the whole game folder, the one with Blur.exe, to the PS5: over FTP to " +
-                (base.state == State::absent ? base.path
-                                             : "/data/sahin/base-games/" + folder) +
-                ", or to a USB drive as a folder named " + folder +
-                " (Blur works too) at its top."));
+                "2. Copy the whole game folder, the one with Blur.exe, to the PS5: over FTP to "
+                "/data/sahin/base-games/Blur (any case works), or to a USB drive as a folder named Blur at its top."));
             blocks.push_back(Block::paragraph(
                 "3. This page notices the copy by itself. Then press Install."));
             if (base.state != State::absent)
@@ -3058,13 +3055,15 @@ std::vector<Screen::SingleRow> Screen::single_rows(const App &app) const
     // The game's settings, kept at once (and written into an installed game's profile).
     SingleRow resolution{"Resolution", {}, 0,
                          "The picture the game draws. Lower is lighter on the console."};
+    // Nothing saved: the row shows the plan's own size, as the install will use it.
     const auto known = settings_.resolutions.find(app.title_id);
+    const library::Resolution shown =
+        known != settings_.resolutions.end() ? known->second : app.game_resolution;
     for (std::size_t i = 0; i < std::size(library::kResolutions); ++i)
     {
         const auto &size = library::kResolutions[i];
         resolution.values.push_back(std::to_string(size.width) + "\xC3\x97" + std::to_string(size.height));
-        if (known != settings_.resolutions.end() && known->second.width == size.width &&
-            known->second.height == size.height)
+        if (shown.width == size.width && shown.height == size.height)
             resolution.value = static_cast<int>(i);
     }
     rows.push_back(std::move(resolution));

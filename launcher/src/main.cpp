@@ -730,7 +730,7 @@ int main()
                 screen.set_locations(std::move(update.locations));
             else if (update.kind == store::Update::Kind::base)
                 screen.set_base(update.entry.id, std::move(update.base), update.game_installed,
-                                std::move(update.game_options));
+                                std::move(update.game_options), update.game_resolution);
             else if (update.kind == store::Update::Kind::icon)
             {
                 const auto listed = hashes.find(update.entry.id);
