@@ -164,6 +164,83 @@ void registry(Reader &read, yyjson_val *root, const char *key, std::vector<Regis
     }
 }
 
+// An XML name as the user files use them: letters, digits, '_', '-', '.', not a digit first.
+bool xml_name(const std::string &name)
+{
+    if (name.empty() || (name[0] >= '0' && name[0] <= '9') || name[0] == '-' || name[0] == '.')
+        return false;
+    for (const char c : name)
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
+              c == '-' || c == '.'))
+            return false;
+    return true;
+}
+
+// An attribute's value: printable, nothing that ends or escapes it, and {width} and {height}
+// the only placeholders.
+bool attribute_value(const std::string &value)
+{
+    for (std::size_t i = 0; i < value.size(); ++i)
+    {
+        const char c = value[i];
+        if (c < 0x20 || c > 0x7e || c == '"' || c == '\'' || c == '<' || c == '>' || c == '&' || c == '}')
+            return false;
+        if (c == '{')
+        {
+            const auto end = value.find('}', i);
+            if (end == std::string::npos)
+                return false;
+            const auto name = value.substr(i, end - i + 1);
+            if (name != "{width}" && name != "{height}")
+                return false;
+            i = end;
+        }
+    }
+    return true;
+}
+
+void user_files(Reader &read, yyjson_val *root, std::vector<UserFile> &out)
+{
+    auto *list = array(read, root, "user_files");
+    std::size_t index = 0, count = 0;
+    yyjson_val *item = nullptr;
+    yyjson_arr_foreach(list, index, count, item)
+    {
+        const auto where = "user_files[" + std::to_string(index) + "]";
+        if (!yyjson_is_obj(item))
+        {
+            read.fail(where + " must be an object");
+            return;
+        }
+        UserFile file;
+        file.file = read.text(item, "file", true, where);
+        file.element = read.text(item, "element", true, where);
+        if (!safe_relative(file.file))
+            read.fail(where + ": file is not a plain relative path");
+        if (!xml_name(file.element))
+            read.fail(where + ": element is not a plain XML name");
+        auto *attributes = yyjson_obj_get(item, "attributes");
+        if (!yyjson_is_obj(attributes) || yyjson_obj_size(attributes) == 0)
+            read.fail(where + ": attributes must be an object with at least one");
+        std::size_t inner = 0, inner_count = 0;
+        yyjson_val *name = nullptr, *value = nullptr;
+        if (yyjson_is_obj(attributes))
+        yyjson_obj_foreach(attributes, inner, inner_count, name, value)
+        {
+            std::string key(yyjson_get_str(name), yyjson_get_len(name));
+            if (!xml_name(key))
+                read.fail(where + ": " + key + " is not a plain XML name");
+            else if (!yyjson_is_str(value) ||
+                     !attribute_value({yyjson_get_str(value), yyjson_get_len(value)}))
+                read.fail(where + ": " + key + " must be plain text ({width} and {height} allowed)");
+            else
+                file.attributes.emplace_back(std::move(key),
+                                             std::string(yyjson_get_str(value), yyjson_get_len(value)));
+        }
+        out.push_back(std::move(file));
+    }
+}
+
 // What a plan and each of its options add to the game: placements, written files, ini
 // edits and the hashes the finished folder must have. label says where (an option's).
 void files(Reader &read, yyjson_val *root, std::vector<Placement> &game_files,
@@ -332,6 +409,7 @@ bool parse_plan(std::string_view text, InstallPlan &out, std::string &error)
         read.fail("registry must be an object");
     registry(read, reg, "machine", plan.machine);
     registry(read, reg, "user", plan.user);
+    user_files(read, root, plan.user_files);
 
     auto *profile = yyjson_obj_get(root, "profile");
     if (!profile || !yyjson_is_obj(profile))

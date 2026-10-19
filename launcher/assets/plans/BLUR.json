@@ -56,6 +56,16 @@
   "machine": [],
   "user": []
  },
+ "user_files": [
+  {
+   "file": "AppData/Roaming/Bizarre Creations/Blur/settings.xml",
+   "element": "shared_graphical_settings",
+   "attributes": {
+    "width": "{width}",
+    "height": "{height}"
+   }
+  }
+ ],
  "profile": {
   "id": "pb-blur",
   "name": "Sahin",

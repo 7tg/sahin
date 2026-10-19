@@ -51,6 +51,17 @@ def test_strip_lists_mod_leftovers(tmp_path):
     strip = {s.lower() for s in plan(tmp_path)["strip"]}
     assert {"dsound.dll", "dinput8.dll", "d3d9.dll", "scripts", "amax", "lua5.1.dll", "discord-rpc.dll"} <= strip
 
+def test_resolution_reaches_blurs_settings(tmp_path):
+    files = plan(tmp_path)["user_files"]
+    assert files == [{
+        "file": "AppData/Roaming/Bizarre Creations/Blur/settings.xml",
+        "element": "shared_graphical_settings",
+        "attributes": {"width": "{width}", "height": "{height}"},
+    }]
+    for f in files:
+        parts = f["file"].split("/")
+        assert all(p not in ("", ".", "..") for p in parts) and "\\" not in f["file"]
+
 def test_no_copyrighted_inline_content(tmp_path):
     text = json.dumps(plan(tmp_path))
     assert "blur_12" not in text and "speed.exe" not in text

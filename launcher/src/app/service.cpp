@@ -363,7 +363,8 @@ bool Service::request_game_settings(const catalog::Entry &entry, library::Overla
 }
 
 // An installed game's profile written again with its settings, and the plan's options its
-// install chose (from the record), so nothing else in it changes.
+// install chose (from the record), so nothing else in it changes; the plan's ini edits and the
+// game's own settings files (its picture size) follow.
 bool Service::settings_job(const catalog::Entry &entry, library::Overlay overlay,
                            library::Cursor cursor, library::Resolution resolution,
                            std::string &error)
@@ -385,7 +386,7 @@ bool Service::settings_job(const catalog::Entry &entry, library::Overlay overlay
             options.chosen.push_back(view.id);
     const auto chosen = library::effective_plan(plan, options);
     return library::install_profile(win_root + "/profiles", chosen.profile, chosen.profile_after, error) &&
-           library::apply_ini(chosen, paths, error);
+           library::apply_ini(chosen, paths, error) && library::apply_user_files(chosen, paths, error);
 }
 
 bool Service::game_plan(const catalog::Entry &entry, library::InstallPlan &plan,

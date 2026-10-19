@@ -62,6 +62,23 @@ struct IniEdit
     bool lf = false; // its line ends written as \n alone
 };
 
+// Attributes set on one element of an XML file the game keeps in the Windows user's folder
+// (drive_c/users/<user> in the prefix, every one but Public): a setting the game saved there
+// that the page's must win over (Blur's picture size in AppData/Roaming/Bizarre Creations/
+// Blur/settings.xml, which it writes once the player saves its Graphics page and then reads
+// before the desktop's size). Only a file that is already there is changed, and only the
+// values of the attributes (one missing from the element is added after the others); every
+// other byte stays. A file without the element is left alone. In a value, {width} and
+// {height} are the profile's picture size.
+//   "user_files": [{"file": "AppData/Roaming/...", "element": "shared_graphical_settings",
+//                   "attributes": {"width": "{width}", "height": "{height}"}}]
+struct UserFile
+{
+    std::string file; // relative to the user's folder
+    std::string element;
+    std::vector<std::pair<std::string, std::string>> attributes; // in the plan's order
+};
+
 struct RegistryValue
 {
     std::string key;  // single backslashes, relative to the file's root
@@ -88,6 +105,7 @@ struct InstallPlan
     std::vector<std::pair<std::string, std::string>> expect;
     std::vector<RegistryValue> machine; // system.reg
     std::vector<RegistryValue> user;    // user.reg
+    std::vector<UserFile> user_files;   // the game's own settings, kept to the profile's
     GameProfile profile;
     std::string profile_after; // profiles.lst: listed after this line, when it's there
     // Pieces of the finished setup the plan can't install yet (no pinned source):

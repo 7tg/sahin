@@ -103,6 +103,13 @@ int main()
            blur.options.size() == 2 && blur.option("online") && blur.upgrades.empty());
     // What earlier mod installs left behind is stripped from the copy.
     assert(blur.strip.size() == 8 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
+    // Blur keeps its picture size in its own settings.xml once the player saves the Graphics
+    // page; the plan keeps it to the page's Resolution.
+    assert(blur.user_files.size() == 1 &&
+           blur.user_files[0].file == "AppData/Roaming/Bizarre Creations/Blur/settings.xml" &&
+           blur.user_files[0].element == "shared_graphical_settings" &&
+           blur.user_files[0].attributes ==
+               (std::vector<std::pair<std::string, std::string>>{{"width", "{width}"}, {"height", "{height}"}}));
     std::string profile;
     assert(profile_text(blur.profile, profile, error));
 
@@ -179,11 +186,17 @@ int main()
         " \"runtime\": {\"fast_clock\": \"true\"}, \"after\": \"other.profile\"},"
         " \"upgrades\": [{\"from\": \"1.0\", \"source\": \"up\"}],"
         " \"strip\": [\"dsound.dll\", \"scripts\", \"amax\"],"
-        " \"pending\": [\"A mod with no source yet\"]}";
+        " \"pending\": [\"A mod with no source yet\"],"
+        " \"user_files\": [{\"file\": \"AppData/Roaming/Game Co/settings.xml\","
+        " \"element\": \"video\", \"attributes\": {\"width\": \"{width}\", \"height\": \"{height}\","
+        " \"mode\": \"full\"}}]}";
     InstallPlan plan;
     assert(parse_plan(plan_text, plan, error));
     assert(plan.pending.size() == 1 && plan.source("mods")->url == "https://example.com/mods.zip");
     assert(plan.strip.size() == 3 && plan.strip[1] == "scripts");
+    assert(plan.user_files.size() == 1 && plan.user_files[0].element == "video" &&
+           plan.user_files[0].attributes.size() == 3 &&
+           plan.user_files[0].attributes[0] == std::make_pair("width"s, "{width}"s));
 
     // Plans that would write outside their folders, or name what isn't there, are refused.
     const auto refused = [&](std::string from, std::string to)
@@ -219,6 +232,19 @@ int main()
     assert(refused("\"to\": \"4558\"", "\"to\": \"45\""));          // not the same length
     assert(refused("\"from\": \"6578\"", "\"from\": \"zz\""));       // not hex
     assert(refused("\"expect\": {\"game.exe\": \"", "\"expect\": {\"../game.exe\": \""));
+    // User files: plain paths, a plain element name, values that can't end the attribute, and
+    // only the placeholders it knows.
+    assert(refused("\"AppData/Roaming", "\"../AppData/Roaming") && error.find("user_files") != std::string::npos);
+    assert(refused("\"AppData/Roaming", "\"/AppData/Roaming"));
+    assert(refused("\"element\": \"video\"", "\"element\": \"vid eo\""));
+    assert(refused("\"element\": \"video\"", "\"element\": \"\""));
+    assert(refused("\"element\": \"video\", ", ""));
+    assert(refused("\"mode\": \"full\"", "\"mode\": \"a\\\"b\""));
+    assert(refused("\"mode\": \"full\"", "\"mode\": \"<b\""));
+    assert(refused("\"mode\": \"full\"", "\"mode\": \"{depth}\""));
+    assert(refused("\"mode\": \"full\"", "\"m o\": \"full\""));
+    assert(refused("\"mode\": \"full\"", "\"mode\": 3"));
+    assert(refused("\"attributes\": {", "\"attributes\": {}, \"x\": {"));
     assert(!parse_plan("[]", plan, error) && plan.game == "GAME"); // nothing changed
 
     // The base copy (its names in other cases), the prefix and its registry, a save.
@@ -472,6 +498,56 @@ int main()
         assert(resolution_named(resolution_name({2560, 1440})).width == 2560 &&
                resolution_named("2560x1440").height == 1440 && resolution_named("800x600").width == 0 &&
                resolution_named("").width == 0);
+    }
+
+    // A settings file the game keeps in the Windows user's folder: once it's there, the
+    // install and a settings change set the element's attributes to the profile's size; only
+    // those values change. Where it isn't, nothing is written; Public and folders reached
+    // through a link are left alone.
+    {
+        const auto users = prefix / "drive_c" / "users";
+        const auto settings = users / "me" / "AppData" / "Roaming" / "Game Co" / "settings.xml";
+        const std::string before =
+            "<?xml version=\"1.0\"?>\r\n<application_settings version=\"1\"/>\r\n"
+            "<!-- <video width=\"1\"/> -->\r\n<videos width=\"7\"/>\r\n"
+            "<video  height = '1440' x=\"0\" width=\"2560\" windowed=\"0\"\tvsync=\"1\"/>\r\n";
+        put(settings, before);
+        put(users / "Public" / "AppData" / "Roaming" / "Game Co" / "settings.xml", "<video width=\"5\"/>");
+        const auto outside = root / "outside";
+        put(outside / "AppData" / "Roaming" / "Game Co" / "settings.xml", "<video width=\"5\"/>");
+        fs::create_directory_symlink(outside, users / "linked");
+        InstallOptions sized = options;
+        sized.width = 3840;
+        sized.height = 2160;
+        assert(install_game(plan, game, paths, sized, progress, go, error));
+        const std::string after =
+            "<?xml version=\"1.0\"?>\r\n<application_settings version=\"1\"/>\r\n"
+            "<!-- <video width=\"1\"/> -->\r\n<videos width=\"7\"/>\r\n"
+            "<video  height = '2160' x=\"0\" width=\"3840\" windowed=\"0\"\tvsync=\"1\" mode=\"full\"/>\r\n";
+        assert(read(settings) == after);
+        assert(read(users / "Public" / "AppData" / "Roaming" / "Game Co" / "settings.xml") == "<video width=\"5\"/>");
+        assert(read(outside / "AppData" / "Roaming" / "Game Co" / "settings.xml") == "<video width=\"5\"/>");
+        // Applied again on its own (a settings change), with the plan's size.
+        auto chosen = effective_plan(plan, options);
+        assert(apply_user_files(chosen, paths, error));
+        assert(read(settings) == "<?xml version=\"1.0\"?>\r\n<application_settings version=\"1\"/>\r\n"
+                                 "<!-- <video width=\"1\"/> -->\r\n<videos width=\"7\"/>\r\n"
+                                 "<video  height = '1080' x=\"0\" width=\"1920\" windowed=\"0\"\tvsync=\"1\" mode=\"full\"/>\r\n");
+        // A file without the element is left as it is.
+        put(settings, "<other/>\n");
+        assert(apply_user_files(chosen, paths, error) && read(settings) == "<other/>\n");
+        // No file: none is made.
+        fs::remove(settings);
+        assert(apply_user_files(chosen, paths, error) && !fs::exists(settings));
+        assert(install_game(plan, game, paths, sized, progress, go, error) && !fs::exists(settings));
+        // An element that ends in a closing tag rather than "/>" takes the attributes too.
+        put(settings, "<video width=\"1\">\n</video>\n");
+        assert(apply_user_files(chosen, paths, error));
+        assert(read(settings) == "<video width=\"1920\" height=\"1080\" mode=\"full\">\n</video>\n");
+        fs::remove(users / "linked");
+        fs::remove_all(outside);
+        fs::remove_all(users / "Public");
+        fs::remove_all(users / "me" / "AppData");
     }
 
     // The touchpad as the mouse (the default now): the plan's touchpad ini edits after its

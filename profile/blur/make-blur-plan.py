@@ -49,6 +49,17 @@ AMAX_CLIENT = [
 ]
 
 
+# Blur saves its picture size in the Windows user's settings.xml once the player accepts its
+# Graphics page, and from then on reads it before the desktop's size: kept to the profile's.
+USER_FILES = [
+    {
+        "file": "AppData/Roaming/Bizarre Creations/Blur/settings.xml",
+        "element": "shared_graphical_settings",
+        "attributes": {"width": "{width}", "height": "{height}"},
+    },
+]
+
+
 def text(name):
     return (HERE / name).read_text()
 
@@ -70,6 +81,7 @@ def plan():
         "texts": [{"to": "dxvk.conf", "body": text("dxvk.conf")}],
         "expect": {},
         "registry": {"machine": [], "user": []},
+        "user_files": USER_FILES,
         "profile": {
             "id": "pb-blur",
             "name": "Sahin",

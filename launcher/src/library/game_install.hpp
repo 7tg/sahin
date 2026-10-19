@@ -128,6 +128,12 @@ InstallPlan effective_plan(const InstallPlan &plan, const InstallOptions &option
 // edits an ini (the cursor). False with error set when the game or one of its files is missing.
 bool apply_ini(const InstallPlan &plan, const InstallPaths &paths, std::string &error);
 
+// The plan's user files (install_plan.hpp) edited in each Windows user's folder of its prefix
+// that holds them, to the plan's profile size: after an install writes the profile, and when a
+// settings change writes it again. A file the game hasn't written yet is left for later; none
+// is made. False with error set when one can't be read or written.
+bool apply_user_files(const InstallPlan &plan, const InstallPaths &paths, std::string &error);
+
 // The plan's options, each on or off as the last install (its record) chose, or as the plan
 // says when there is no install yet.
 std::vector<OptionView> option_views(const InstallPlan &plan, const InstallPaths &paths,

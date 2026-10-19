@@ -398,6 +398,87 @@ bool patch_bytes(const std::string &path, const BytePatch &patch, std::string &e
     return true;
 }
 
+// The first element named element in an XML text (comments, CDATA and declarations
+// skipped) given the values: each attribute's value replaced between its quotes, one it
+// lacks added after its last. False when there is no such element, or it doesn't read as one.
+bool set_attributes(std::string &text, const std::string &element,
+                    const std::vector<std::pair<std::string, std::string>> &values)
+{
+    const auto space = [&](std::size_t at)
+    { return at < text.size() && (text[at] == ' ' || text[at] == '\t' || text[at] == '\r' || text[at] == '\n'); };
+    const auto skip_to = [&](std::size_t from, const char *end) -> std::size_t
+    {
+        const auto at = text.find(end, from);
+        return at == std::string::npos ? std::string::npos : at + std::strlen(end);
+    };
+    std::size_t at = 0;
+    while ((at = text.find('<', at)) != std::string::npos)
+    {
+        if (text.compare(at, 4, "<!--") == 0)
+            at = skip_to(at + 4, "-->");
+        else if (text.compare(at, 9, "<![CDATA[") == 0)
+            at = skip_to(at + 9, "]]>");
+        else if (text.compare(at, 2, "<?") == 0)
+            at = skip_to(at + 2, "?>");
+        else if (text.compare(at, 2, "<!") == 0)
+            at = skip_to(at + 2, ">");
+        else if (text.compare(at + 1, element.size(), element) == 0 &&
+                 (space(at + 1 + element.size()) || text.compare(at + 1 + element.size(), 1, "/") == 0 ||
+                  text.compare(at + 1 + element.size(), 1, ">") == 0))
+            break;
+        else
+            ++at;
+        if (at == std::string::npos)
+            return false;
+    }
+    if (at == std::string::npos)
+        return false;
+    std::size_t cursor = at + 1 + element.size(), last = cursor;
+    std::vector<bool> set(values.size(), false);
+    for (;;)
+    {
+        while (space(cursor))
+            ++cursor;
+        if (cursor >= text.size())
+            return false;
+        if (text[cursor] == '/' || text[cursor] == '>')
+            break;
+        const auto name_at = cursor;
+        while (cursor < text.size() && !space(cursor) && text[cursor] != '=' && text[cursor] != '/' &&
+               text[cursor] != '>')
+            ++cursor;
+        const auto name = text.substr(name_at, cursor - name_at);
+        while (space(cursor))
+            ++cursor;
+        if (cursor >= text.size() || text[cursor] != '=')
+            return false;
+        ++cursor;
+        while (space(cursor))
+            ++cursor;
+        if (cursor >= text.size() || (text[cursor] != '"' && text[cursor] != '\''))
+            return false;
+        const auto value_at = cursor + 1;
+        auto value_end = text.find(text[cursor], value_at);
+        if (value_end == std::string::npos)
+            return false;
+        for (std::size_t i = 0; i < values.size(); ++i)
+            if (!set[i] && values[i].first == name)
+            {
+                text.replace(value_at, value_end - value_at, values[i].second);
+                value_end = value_at + values[i].second.size();
+                set[i] = true;
+                break;
+            }
+        cursor = last = value_end + 1;
+    }
+    std::string added;
+    for (std::size_t i = 0; i < values.size(); ++i)
+        if (!set[i])
+            added += " " + values[i].first + "=\"" + values[i].second + "\"";
+    text.insert(last, added);
+    return true;
+}
+
 std::string json_text(const std::string &text)
 {
     std::string out = "\"";
@@ -560,6 +641,73 @@ bool apply_ini(const InstallPlan &plan, const InstallPaths &paths, std::string &
             if (error.empty())
                 error = "Can't find " + edit.file;
             return false;
+        }
+    }
+    return true;
+}
+
+bool apply_user_files(const InstallPlan &plan, const InstallPaths &paths, std::string &error)
+{
+    if (plan.user_files.empty())
+        return true;
+    std::string users;
+    resolve(paths.win_root + "/prefixes/" + plan.prefix, "drive_c/users", false, users);
+    const auto size = [&](const std::string &value)
+    {
+        std::string out = value;
+        for (const auto &[name, number] : {std::pair<std::string, unsigned>{"{width}", plan.profile.width},
+                                           {"{height}", plan.profile.height}})
+            for (auto at = out.find(name); at != std::string::npos; at = out.find(name, at))
+            {
+                out.replace(at, name.size(), std::to_string(number));
+                at += std::to_string(number).size();
+            }
+        return out;
+    };
+    for (const auto &user : names_in(users))
+    {
+        // A user's own folder, not one reached through a link: nothing outside the prefix.
+        if (strcasecmp(user.c_str(), "Public") == 0 || !is_directory(users + "/" + user))
+            continue;
+        for (const auto &file : plan.user_files)
+        {
+            std::string path = users + "/" + user;
+            bool inside = true;
+            for (std::size_t start = 0; inside;)
+            {
+                const auto end = file.file.find('/', start);
+                if (end == std::string::npos)
+                    break;
+                std::string folder;
+                resolve(path, file.file.substr(start, end - start), false, folder);
+                path = folder;
+                inside = is_directory(path);
+                start = end + 1;
+            }
+            if (!inside)
+                continue;
+            std::string found;
+            resolve(path, file.file.substr(file.file.rfind('/') + 1), false, found);
+            path = found;
+            if (!is_file(path))
+                continue; // the game hasn't saved it yet
+            std::string text;
+            if (!hui::save::read_file(path, &text, 4u << 20))
+            {
+                error = "Can't read " + user + "/" + file.file;
+                return false;
+            }
+            std::vector<std::pair<std::string, std::string>> values;
+            for (const auto &[name, value] : file.attributes)
+                values.emplace_back(name, size(value));
+            auto edited = text;
+            if (!set_attributes(edited, file.element, values) || edited == text)
+                continue;
+            if (const auto failed = hui::save::write_atomic(path, edited); !failed.empty())
+            {
+                error = "Can't write " + user + "/" + file.file + ": " + failed;
+                return false;
+            }
         }
     }
     return true;
@@ -890,7 +1038,8 @@ bool install_game(const InstallPlan &given, const Manifest &manifest, const Inst
         !save_registry(prefix + "/system.reg", machine, error) ||
         !save_registry(prefix + "/user.reg", user, error))
         return false;
-    if (!install_profile(paths.win_root + "/profiles", plan.profile, plan.profile_after, error))
+    if (!install_profile(paths.win_root + "/profiles", plan.profile, plan.profile_after, error) ||
+        !apply_user_files(plan, paths, error))
         return false;
 
     // ---- what was installed, for repair and updates ----
