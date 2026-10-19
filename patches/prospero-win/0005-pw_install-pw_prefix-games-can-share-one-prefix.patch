@@ -1,0 +1,269 @@
+From 889d02a960574099c309458f031700044be94b72 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 18:22:40 -0500
+Subject: [PATCH 05/24] pw_install, pw_prefix: games can share one prefix
+
+pw_install --prefix NAME (or the script's prospero.prefix) installs into
+LIBRARY/prefixes/NAME: the first game creates it, later ones install into
+it with their create_prefix task skipped, and each profile says
+prefix = NAME. Games that look for each other's saves (NFS Carbon and an
+NFS Most Wanted save, UG2 and a UG1 save) find them, as on a PC.
+
+pw_prefix follows the profile's prefix: pushing or pulling any game in a
+shared prefix syncs LIBRARY/prefixes/NAME with one manifest, .pw/NAME.json.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ tests/test_pw_install.py | 21 +++++++++++++++++++++
+ tests/test_pw_prefix.py  | 23 +++++++++++++++++++++++
+ tools/pw_install.py      | 35 ++++++++++++++++++++++++++++-------
+ tools/pw_prefix.py       | 33 +++++++++++++++++++++++++++------
+ 4 files changed, 99 insertions(+), 13 deletions(-)
+
+diff --git a/tests/test_pw_install.py b/tests/test_pw_install.py
+index 8cf77bf..802ed9e 100644
+--- a/tests/test_pw_install.py
++++ b/tests/test_pw_install.py
+@@ -329,6 +329,27 @@ def main() -> int:
+         assert "graphics = dxvk" in (library / "profiles" / "forced-dxvk.profile").read_text()
+         assert (forced_prefix / "drive_c/windows/syswow64/d3d8.dll").read_bytes() == b"x32/d3d8"
+ 
++        # Games can share a prefix: the first creates it, the next installs
++        # into it without wineboot, and each profile names the shared prefix.
++        shared = [str(script), "--library", str(library), "--wine", str(wine),
++                  "--file", f"setup={setup}", "--prefix", "series"]
++        log.write_text("")
++        assert pw_install.main(shared + ["--slug", "series-one"]) == 0
++        series = library / "prefixes" / "series"
++        assert (series / "system.reg").is_file() and "wineboot --init" in log.read_text()
++        (series / "drive_c/users/prospero/Documents/save-one").write_text("one")
++        log.write_text("")
++        assert pw_install.main(shared + ["--slug", "series-two"]) == 0
++        assert "wineboot --init" not in log.read_text() and f"prefix={series}" in log.read_text()
++        assert (series / "drive_c/users/prospero/Documents/save-one").read_text() == "one"
++        for slug in ("series-one", "series-two"):
++            assert "prefix = series" in (library / "profiles" / f"{slug}.profile").read_text().splitlines()
++        assert not (library / "prefixes" / "series-two").exists()
++        # The same game twice is refused; so is a shared name that is not a prefix.
++        assert pw_install.main(shared + ["--slug", "series-two"]) == 1
++        (library / "prefixes" / "notaprefix").mkdir()
++        assert pw_install.main(shared[:-1] + ["notaprefix", "--slug", "series-three"]) == 1
++
+         invalid_script = root / "invalid-graphics.yml"
+         invalid_script.write_text(SCRIPT.replace("  display:", "  graphics: metal\n  display:", 1))
+         assert pw_install.main([str(invalid_script), "--library", str(library), "--wine", str(wine),
+diff --git a/tests/test_pw_prefix.py b/tests/test_pw_prefix.py
+index 1cf5484..723cbef 100644
+--- a/tests/test_pw_prefix.py
++++ b/tests/test_pw_prefix.py
+@@ -386,6 +386,28 @@ def check_console_user(root: Path) -> None:
+     assert not (console / REMOTE_PREFIX / "drive_c/users/prospero/AppData").exists()
+ 
+ 
++def check_shared_prefix(root: Path) -> None:
++    """Games whose profiles name one prefix push and pull that prefix, with one manifest."""
++    library, console, fast = new_game(root, "shared")
++    os.rename(library / "prefixes/game", library / "prefixes/series")
++    (library / "profiles/game.profile").write_text("[application]\nid = game\nprefix = series\n")
++    (library / "profiles/sequel.profile").write_text("; the next game\n[application]\nid = sequel\nprefix = series\n")
++    remote = DirRemote(console)
++    with contextlib.redirect_stdout(io.StringIO()):
++        assert pw_prefix.main(["push", "game", *fast], remote) == 0
++    assert (console / "data/prospero-win/prefixes/series" / GAME / "game.exe").read_bytes() == b"MZ game"
++    assert not (console / REMOTE_PREFIX).exists()
++    assert (library / ".pw/series.json").is_file() and not (library / ".pw/game.json").exists()
++    # The sequel shares the prefix and its manifest: no game file is sent again.
++    remote = DirRemote(console)
++    with contextlib.redirect_stdout(io.StringIO()):
++        assert pw_prefix.main(["push", "sequel", *fast], remote) == 0
++    assert not game_writes(remote)
++    listed = (console / "data/prospero-win/profiles/profiles.lst").read_text().split()
++    assert "game.profile" in listed and "sequel.profile" in listed
++    assert pw_prefix.profile_prefix(library / "profiles/missing.profile") is None
++
++
+ def check_pull_home_links(root: Path) -> None:
+     """A pull never writes through Wine's links into the PC's home: the
+     folder becomes a real one in the prefix, as it is on the console."""
+@@ -551,6 +573,7 @@ def main() -> int:
+         check_ps5upload(root)
+         check_console_user(root)
+         check_pull_home_links(root)
++        check_shared_prefix(root)
+     check_ftp_without_self()
+     print("pw_prefix passed")
+     return 0
+diff --git a/tools/pw_install.py b/tools/pw_install.py
+index 237713a..893da16 100755
+--- a/tools/pw_install.py
++++ b/tools/pw_install.py
+@@ -13,7 +13,12 @@ pinned Wine instead of Lutris's own builds, and refuses any it does not
+ implement rather than skipping them.
+ 
+ Each game gets its own prefix, LIBRARY/prefixes/<slug>, which is $GAMEDIR,
+-and a profile, LIBRARY/profiles/<slug>.profile, generated from the script's
++unless the script's `prospero: {prefix: NAME}` (or --prefix NAME) names a
++prefix several games share, LIBRARY/prefixes/NAME: the first game creates
++it, later ones install into it (their create_prefix task is skipped), so
++games that look for each other's saves or registry keys find them, as on a
++PC. Each game still has its own profile,
++LIBRARY/profiles/<slug>.profile, generated from the script's
+ `game` section and a `prospero` block (ignored by Lutris) for what only the
+ console needs: the desktop size, scaling and input. LIBRARY mirrors
+ /data/prospero-win on the console.
+@@ -284,7 +289,13 @@ class Installer:
+         if not self.slug or not SLUG.match(self.slug):
+             raise InstallError(f"the script's slug {self.slug!r} is not a profile id (use --slug)")
+         self.library = Path(args.library).resolve()
+-        self.gamedir = self.library / "prefixes" / self.slug
++        prospero = document.get("prospero") or self.script.get("prospero") or {}
++        self.prefix_name = getattr(args, "prefix", None) or prospero.get("prefix") or self.slug
++        if not SLUG.match(self.prefix_name):
++            raise InstallError(f"the prefix name {self.prefix_name!r} is not a valid name")
++        self.shared_prefix = self.prefix_name != self.slug
++        self.existing_prefix = False
++        self.gamedir = self.library / "prefixes" / self.prefix_name
+         self.cache = self.library / ".cache" / self.slug
+         # As given, not resolved: a build tree's wine is a symlink into
+         # tools/wine, and its wineserver is server/wineserver beside it.
+@@ -430,7 +441,9 @@ class Installer:
+     def task(self, task: dict) -> None:
+         name = task.get("name")
+         env = self.wine_env(task)
+-        if name == "create_prefix":
++        if name == "create_prefix" and self.existing_prefix:
++            log(f"create_prefix: installing into the existing shared prefix {self.prefix_name}")
++        elif name == "create_prefix":
+             # As in Lutris, Gecko and Mono only when the script asks for them.
+             # wineboot installs Gecko from Wine's download cache, where the
+             # pinned packages are put first.
+@@ -682,7 +695,7 @@ class Installer:
+             lines.append(f"arguments = {self.expand(str(game['args']))}")
+         if by_mode:
+             lines.append("dll_overrides = " + ";".join(f"{','.join(dlls)}={mode}" for mode, dlls in by_mode.items()))
+-        lines += [f"prefix = {self.slug}", "runtime = wine-wow64", f"architecture = {pe_architecture(exe)}",
++        lines += [f"prefix = {self.prefix_name}", "runtime = wine-wow64", f"architecture = {pe_architecture(exe)}",
+                   f"graphics = {self.graphics_mode()}"]
+         for section, keys in (("display", PROSPERO_DISPLAY), ("input", PROSPERO_INPUT)):
+             values = [(key, prospero[section][key]) for key in keys if key in (prospero.get(section) or {})]
+@@ -709,10 +722,17 @@ class Installer:
+             self.mesa_files = mesa_provider(self.mesa_zink)
+         elif self.mesa_zink:
+             raise InstallError("--mesa-zink requires prospero.graphics=opengl")
+-        if self.gamedir.exists():
++        profile = self.library / "profiles" / f"{self.slug}.profile"
++        if self.gamedir.exists() and not self.shared_prefix:
+             raise InstallError(f"{self.gamedir} exists: remove it to reinstall {self.slug}")
++        if self.gamedir.exists():
++            if not (self.gamedir / "system.reg").is_file():
++                raise InstallError(f"{self.gamedir} exists but is not a prefix (no system.reg)")
++            if profile.exists():
++                raise InstallError(f"{profile} exists: {self.slug} is already installed in {self.prefix_name}")
++            self.existing_prefix = True
+         self.resolve_files()
+-        self.gamedir.mkdir(parents=True)
++        self.gamedir.mkdir(parents=True, exist_ok=True)
+         for step in self.script.get("installer") or []:
+             self.directive(step)
+         if not (self.gamedir / "system.reg").is_file():
+@@ -721,7 +741,6 @@ class Installer:
+         self.unlink_home_folders(self.gamedir)
+         dxvk_dlls = self.install_dxvk()
+         self.install_mesa_zink()
+-        profile = self.library / "profiles" / f"{self.slug}.profile"
+         profile.parent.mkdir(parents=True, exist_ok=True)
+         profile.write_text(self.profile(dxvk_dlls))
+         subprocess.run([str(self.wineserver), "-w"], env=self.wine_env())
+@@ -749,6 +768,8 @@ def main(argv: list[str] | None = None) -> int:
+     parser.add_argument("--library", required=True, help="the local mirror of /data/prospero-win")
+     parser.add_argument("--wine", required=True, help="the pinned host Wine (build-wow64/wine)")
+     parser.add_argument("--slug", help="the profile id, when the script has no game_slug")
++    parser.add_argument("--prefix", help="install into the shared prefix LIBRARY/prefixes/PREFIX "
++                        "(overrides the script's prospero.prefix)")
+     parser.add_argument("--file", action="append", default=[], metavar="ID=PATH")
+     parser.add_argument("--input", action="append", default=[], metavar="ID=VALUE")
+     parser.add_argument("--mesa-zink", type=Path, help="validated local Mesa WGL/Zink artifact directory; requires graphics=opengl")
+diff --git a/tools/pw_prefix.py b/tools/pw_prefix.py
+index 22ab4f8..d6c1d60 100755
+--- a/tools/pw_prefix.py
++++ b/tools/pw_prefix.py
+@@ -16,6 +16,10 @@ A push saves the manifest as it goes (every SAVE_EVERY_FILES files or
+ SAVE_EVERY_BYTES bytes, and when interrupted), so a push that stops part way
+ resumes where it stopped.
+ 
++Games whose profiles say the same `prefix = NAME` share one prefix (see
++tools/pw_install.py --prefix): pushing or pulling any of them syncs that
++prefix, LIBRARY/prefixes/NAME, with one manifest, LIBRARY/.pw/NAME.json.
++
+ The console's prefix is the game's live state: games keep settings in the
+ registry and saves beside themselves. A push refuses to overwrite a console
+ prefix it does not know, or one whose registry changed since the last push
+@@ -118,6 +122,22 @@ def to_pc(key: str, data: bytes) -> bytes:
+     return swap_cpu(key, data, CONSOLE_CPU, PC_CPU)
+ 
+ 
++def profile_prefix(profile: Path) -> str | None:
++    """The `prefix =` of a profile's [application] section, if it names one."""
++    if not profile.is_file():
++        return None
++    section = None
++    for line in profile.read_text(encoding="latin-1").splitlines():
++        line = line.split(";", 1)[0].strip()
++        if line.startswith("[") and line.endswith("]"):
++            section = line[1:-1].strip().lower()
++        elif section == "application" and "=" in line:
++            key, value = (part.strip() for part in line.split("=", 1))
++            if key.lower() == "prefix" and value and value != "default":
++                return value
++    return None
++
++
+ class SyncError(Exception):
+     pass
+ 
+@@ -340,11 +360,12 @@ class Sync:
+     def __init__(self, args: argparse.Namespace, remote=None):
+         self.slug = args.slug
+         self.library = Path(args.library).resolve()
+-        self.prefix = self.library / "prefixes" / self.slug
+         self.profile = self.library / "profiles" / f"{self.slug}.profile"
++        self.prefix_name = profile_prefix(self.profile) or self.slug
++        self.prefix = self.library / "prefixes" / self.prefix_name
+         self.remote_root = args.remote.rstrip("/")
+-        self.remote_prefix = f"{self.remote_root}/prefixes/{self.slug}"
+-        self.manifest_path = self.library / ".pw" / f"{self.slug}.json"
++        self.remote_prefix = f"{self.remote_root}/prefixes/{self.prefix_name}"
++        self.manifest_path = self.library / ".pw" / f"{self.prefix_name}.json"
+         self.manifest = json.loads(self.manifest_path.read_text()) if self.manifest_path.is_file() else None
+         self.force, self.delete = args.force, getattr(args, "delete", False)
+         self.trust_size = getattr(args, "trust_size", False)
+@@ -364,7 +385,7 @@ class Sync:
+ 
+     def save(self, files: dict[str, list]) -> None:
+         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+-        self.manifest = {"slug": self.slug, "files": files}
++        self.manifest = {"slug": self.prefix_name, "files": files}
+         # Replaced whole, so a push killed while saving keeps the last one.
+         partial = self.manifest_path.with_name(self.manifest_path.name + ".tmp")
+         partial.write_text(json.dumps(self.manifest, indent=1, sort_keys=True))
+@@ -494,7 +515,7 @@ class Sync:
+ 
+     def send_batch(self, batch: list[tuple[str, Path, list]], pushed: dict[str, list]) -> int:
+         """Sends files through ps5upload, from a directory of links to them, and checks them over FTP."""
+-        stage = self.library / ".pw" / "stage" / self.slug
++        stage = self.library / ".pw" / "stage" / self.prefix_name
+         shutil.rmtree(stage, ignore_errors=True)
+         size = sum(entry[0] for _, _, entry in batch)
+         log(f"sending {len(batch)} files ({gib(size)}) through ps5upload")
+@@ -578,7 +599,7 @@ class Sync:
+                 local.unlink()  # the console's file, not what the link points to
+             local.write_bytes(to_pc(key, data))
+             return entry, True
+-        partial = self.manifest_path.with_name(f"{self.slug}.pull")
++        partial = self.manifest_path.with_name(f"{self.prefix_name}.pull")
+         partial.parent.mkdir(parents=True, exist_ok=True)
+         try:
+             with partial.open("wb") as out:
+-- 
+2.56.0
+

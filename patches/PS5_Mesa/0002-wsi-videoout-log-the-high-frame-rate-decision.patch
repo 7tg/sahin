@@ -1,0 +1,51 @@
+From 778c72e6f403f6ee37578b4c5c0ab62cf7a5504b Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 19:29:45 -0500
+Subject: [PATCH 2/3] wsi/videoout: log the high-frame-rate decision
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01A9xZzd6eUvy4WLFbfGr4Yi
+---
+ src/vulkan/wsi/wsi_common_videoout.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/vulkan/wsi/wsi_common_videoout.c b/src/vulkan/wsi/wsi_common_videoout.c
+index 308c9773258..0ec58d764cb 100644
+--- a/src/vulkan/wsi/wsi_common_videoout.c
++++ b/src/vulkan/wsi/wsi_common_videoout.c
+@@ -324,6 +324,7 @@ videoout_title_declares_high_frame_rate(void)
+    }
+    if (file == NULL) {
+       fprintf(stderr, "wsi/videoout: no sce_sys/param.json; presenting at 59.94 Hz\n");
++      fflush(stderr);
+       return false;
+    }
+    char text[16384];
+@@ -377,16 +378,23 @@ videoout_open_locked(void)
+       fprintf(stderr, "wsi/videoout: sceVideoOutOpen failed: 0x%08x\n", (unsigned)out->handle);
+       return false;
+    }
+-   if (videoout_title_declares_high_frame_rate()) {
++   const bool declares = videoout_title_declares_high_frame_rate();
++   fprintf(stderr, "wsi/videoout: title %s high-frame-rate output\n", declares ? "declares" : "does not declare");
++   fflush(stderr);
++   if (declares) {
+       const int supported =
+          sceVideoOutIsOutputSupported(out->handle, PS5_VIDEO_OUT_MODE_HIGH_FRAME_RATE, NULL, NULL, NULL);
+       const int configured =
+          supported > 0
+             ? sceVideoOutConfigureOutput(out->handle, PS5_VIDEO_OUT_MODE_HIGH_FRAME_RATE, NULL, NULL, NULL)
+             : supported;
++      fprintf(stderr, "wsi/videoout: 119.88 Hz supported=%d configured=%d\n", supported, configured);
++      fflush(stderr);
+       out->high_frame_rate = configured == 0;
+       if (out->high_frame_rate) {
+          const uint64_t period = videoout_vblank_period_ns(out->handle);
++         fprintf(stderr, "wsi/videoout: vblank period %.3f ms\n", (double)period / 1e6);
++         fflush(stderr);
+          if (period > VIDEOOUT_HIGH_REFRESH_LIMIT_NS) {
+             sceVideoOutConfigureOutput(out->handle, PS5_VIDEO_OUT_MODE_RESTORE, NULL, NULL, NULL);
+             out->high_frame_rate = false;
+-- 
+2.56.0
+

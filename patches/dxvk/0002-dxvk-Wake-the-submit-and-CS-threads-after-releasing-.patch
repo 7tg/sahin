@@ -1,0 +1,130 @@
+From bec066a09e7200728272e18aee29a34829691c99 Mon Sep 17 00:00:00 2001
+From: Manuel Pereira <manuelpereiralds@gmail.com>
+Date: Sat, 10 Oct 2026 02:00:23 +0200
+Subject: [PATCH 2/2] [dxvk] Wake the submit and CS threads after releasing the
+ queue lock
+
+DxvkSubmissionQueue::submit and present, and DxvkCsThread::dispatchChunk
+and injectChunk, notified their condition variable while still holding
+the mutex. The woken thread then tried to take that mutex, found it held
+by the notifier and blocked again, so the notifier's unlock had to wake
+it a second time. On Wine each wake is WakeConditionVariable or a lock
+release going through the WoW64 bridge, so a flush paid two syscall
+round trips where one is enough. Now the lock is released first and the
+wake comes after it. The submission queue also uses notify_one instead
+of notify_all, because the dxvk-submit thread is the only waiter on
+m_appendCond (the destructor keeps its notify_all). The CS thread already
+used notify_one. The waiters re-check their predicate under the lock, so
+behaviour is otherwise unchanged; m_finishCond is untouched. The console
+profile of GTA IV shows 14 flushes a frame at about 0.43 ms each, with
+the submit wake as the dominant part of that time.
+
+Claude-Session: https://claude.ai/code/session_01CiY4gC3WzT5sHhDK5Uwozc
+(cherry picked from commit 72342f0c48d72ee2d6597e0b945ec63c4a6da8b6)
+---
+ src/dxvk/dxvk_cs.cpp    | 10 ++++++----
+ src/dxvk/dxvk_queue.cpp | 40 +++++++++++++++++++++++-----------------
+ 2 files changed, 29 insertions(+), 21 deletions(-)
+
+diff --git a/src/dxvk/dxvk_cs.cpp b/src/dxvk/dxvk_cs.cpp
+index 06f6aa48..8d7838e1 100644
+--- a/src/dxvk/dxvk_cs.cpp
++++ b/src/dxvk/dxvk_cs.cpp
+@@ -123,9 +123,11 @@ namespace dxvk {
+       auto& entry = m_queueOrdered.queue.emplace_back();
+       entry.chunk = std::move(chunk);
+       entry.seq = seq;
+-
+-      m_condOnAdd.notify_one();
+     }
++
++    // Wake the CS thread after releasing the lock so
++    // that it does not immediately block on it again
++    m_condOnAdd.notify_one();
+     
+     return seq;
+   }
+@@ -144,8 +146,6 @@ namespace dxvk {
+       entry.chunk = std::move(chunk);
+       entry.seq = timeline;
+ 
+-      m_condOnAdd.notify_one();
+-
+       if (queue == DxvkCsQueue::HighPriority) {
+         // Worker will check this flag after executing any
+         // chunk without causing additional lock contention
+@@ -153,6 +153,8 @@ namespace dxvk {
+       }
+     }
+ 
++    m_condOnAdd.notify_one();
++
+     if (synchronize) {
+       std::unique_lock<dxvk::mutex> lock(m_counterMutex);
+ 
+diff --git a/src/dxvk/dxvk_queue.cpp b/src/dxvk/dxvk_queue.cpp
+index e705ed91..2eb63823 100644
+--- a/src/dxvk/dxvk_queue.cpp
++++ b/src/dxvk/dxvk_queue.cpp
+@@ -48,19 +48,23 @@ namespace dxvk {
+           DxvkSubmitInfo            submitInfo,
+           DxvkLatencyInfo           latencyInfo,
+           DxvkSubmitStatus*         status) {
+-    std::unique_lock<dxvk::mutex> lock(m_mutex);
++    { std::unique_lock<dxvk::mutex> lock(m_mutex);
+ 
+-    m_finishCond.wait(lock, [this] {
+-      return m_submitQueue.size() + m_finishQueue.size() <= MaxNumQueuedCommandBuffers;
+-    });
++      m_finishCond.wait(lock, [this] {
++        return m_submitQueue.size() + m_finishQueue.size() <= MaxNumQueuedCommandBuffers;
++      });
+ 
+-    DxvkSubmitEntry entry = { };
+-    entry.status = status;
+-    entry.submit = std::move(submitInfo);
+-    entry.latency = std::move(latencyInfo);
++      DxvkSubmitEntry entry = { };
++      entry.status = status;
++      entry.submit = std::move(submitInfo);
++      entry.latency = std::move(latencyInfo);
+ 
+-    m_submitQueue.push(std::move(entry));
+-    m_appendCond.notify_all();
++      m_submitQueue.push(std::move(entry));
++    }
++
++    // Wake the submit thread, the only waiter on this condition variable,
++    // after releasing the lock so that it does not block on it right away.
++    m_appendCond.notify_one();
+   }
+ 
+ 
+@@ -68,15 +72,17 @@ namespace dxvk {
+           DxvkPresentInfo           presentInfo,
+           DxvkLatencyInfo           latencyInfo,
+           DxvkSubmitStatus*         status) {
+-    std::unique_lock<dxvk::mutex> lock(m_mutex);
++    { std::unique_lock<dxvk::mutex> lock(m_mutex);
+ 
+-    DxvkSubmitEntry entry = { };
+-    entry.status  = status;
+-    entry.present = std::move(presentInfo);
+-    entry.latency = std::move(latencyInfo);
++      DxvkSubmitEntry entry = { };
++      entry.status  = status;
++      entry.present = std::move(presentInfo);
++      entry.latency = std::move(latencyInfo);
+ 
+-    m_submitQueue.push(std::move(entry));
+-    m_appendCond.notify_all();
++      m_submitQueue.push(std::move(entry));
++    }
++
++    m_appendCond.notify_one();
+   }
+ 
+ 
+-- 
+2.56.0
+

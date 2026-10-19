@@ -1,0 +1,207 @@
+From b2fb4f7fa347d212fe239ff88f4ed3c6f022363b Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 19:38:27 -0500
+Subject: [PATCH 11/24] Games' own apps: prospero-win under another title id,
+ starting one game
+
+A tile that hands over to PPSA99995 works but shows the switch. A game's
+own app is the whole title under its own id and icon: started from Home
+with no arguments it runs PW_AUTOSTART_PROFILE with home=1 (no launcher)
+and closes to Home when the game ends.
+
+build_native.sh takes PW_TITLE_ID, PW_AUTOSTART_PROFILE and PW_LAPY_DIR (a
+locally built Lapy helper, still checked against the title, protocol and
+ELF digests); defaults are unchanged. tools/build_game_app.sh builds the
+helper for the app's id from PS5-Lapy-JB-Daemon v0.3.2-experimental
+(b48b7d7; a helper only elevates its TARGET_TITLE), the eboot, and the app
+folder from the PPSA99995 package.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c    | 21 ++++++++++
+ tools/build_game_app.sh | 86 +++++++++++++++++++++++++++++++++++++++++
+ tools/build_native.sh   | 18 ++++++++-
+ 3 files changed, 123 insertions(+), 2 deletions(-)
+ create mode 100755 tools/build_game_app.sh
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 04e28d5..67938cc 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -56,7 +56,17 @@
+ #include <time.h>
+ #include <unistd.h>
+ 
++/* The title this eboot is built for (tools/build_native.sh, PW_TITLE_ID):
++ * PPSA99995 is prospero-win itself; a game's own app (tools/build_game_app.sh)
++ * has its own id, Lapy helper and sandbox path. */
++#ifndef PW_TITLE_ID
+ #define PW_TITLE_ID "PPSA99995"
++#endif
++/* A game's own app starts that profile when the system starts it with no
++ * game, and closes to Home when the game ends; empty for prospero-win. */
++#ifndef PW_AUTOSTART_PROFILE
++#define PW_AUTOSTART_PROFILE ""
++#endif
+ #define PW_APP_NAME "prospero-win-wine64"
+ 
+ /* Where the title's Wine runtime can be seen: /app0 inside the sandbox;
+@@ -973,6 +983,17 @@ int main(int argc, char **argv)
+         return 1;
+     }
+     (void)pw_wine_launch_parse(argc, argv, catalog, catalog_count, &launch);
++    static const char autostart_profile[] = PW_AUTOSTART_PROFILE;
++    if (launch.mode != PW_WINE_LAUNCH_GAME && !launch.refused && autostart_profile[0] != '\0') {
++        static char autostart_word[] = "profile=" PW_AUTOSTART_PROFILE;
++        static char home_word[] = "home=1";
++        char *autostart[] = { autostart_word, home_word };
++        uint32_t cycle = launch.cycle;
++        (void)pw_wine_launch_parse(2, autostart, catalog, catalog_count, &launch);
++        launch.cycle = cycle;
++        PS5LOG_LOG("PW_WINE64 autostart profile=%s mode=%s", PW_AUTOSTART_PROFILE,
++                   launch.mode == PW_WINE_LAUNCH_GAME ? "game" : "launcher");
++    }
+     (void)pw_diagnostics_open(library_root, PW_BUILD_ID,
+                               launch.app ? launch.app->id : "launcher", launch.cycle);
+     PS5LOG_LOG("PW_WINE64 args argc=%d mode=%s profile=%s cycle=%u refused=%u", argc,
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+new file mode 100755
+index 0000000..8f6ffc9
+--- /dev/null
++++ b/tools/build_game_app.sh
+@@ -0,0 +1,86 @@
++#!/usr/bin/env bash
++# SPDX-License-Identifier: LGPL-2.1-or-later
++# Build a game's own app: prospero-win under its own title id, name and icon,
++# that starts one profile straight from the Home screen (no launcher) and
++# closes to Home when the game ends. It shares /data/prospero-win (profiles,
++# prefixes, saves) with prospero-win.
++#
++# The app is prospero-win's package (tools/package_release.sh's PPSA99995)
++# with three things of its own:
++#   eboot.bin  tools/build_native.sh with PW_TITLE_ID and PW_AUTOSTART_PROFILE
++#              (the title id also names the sandbox path the runtime is read from);
++#   lapy.elf   the Lapy helper built for this title id: a helper only elevates
++#              the title it was built for (PS5-Lapy-JB-Daemon, TARGET_TITLE);
++#   sce_sys/   param.json with the id and name, and the icon.
++#
++#   tools/build_game_app.sh --title-id PPSA99996 --name "NFS Most Wanted" \
++#       --profile nfs-most-wanted-2005 [--icon art.png] \
++#       --package ../release-main/PPSA99995 --out ../release-main/apps
++set -euo pipefail
++root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
++lapy_url=https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git
++lapy_commit=b48b7d7236eca25c7b9dfd6c040c763ae05dde80   # v0.3.2-experimental, as build_native.sh fetches
++title_id= name= profile= icon= package= out=
++while [[ $# -gt 0 ]]; do
++    case $1 in
++    --title-id) title_id=$2; shift 2 ;;
++    --name) name=$2; shift 2 ;;
++    --profile) profile=$2; shift 2 ;;
++    --icon) icon=$2; shift 2 ;;
++    --package) package=$2; shift 2 ;;
++    --out) out=$2; shift 2 ;;
++    *) echo "build_game_app: unknown argument $1" >&2; exit 2 ;;
++    esac
++done
++[[ $title_id =~ ^[A-Z]{4}[0-9]{5}$ && $title_id != PPSA99995 && -n $name &&
++   $profile =~ ^[A-Za-z0-9_.-]+$ && -f $package/eboot.bin && -n $out ]] || {
++    echo "usage: $0 --title-id PPSA99996 --name NAME --profile ID [--icon PNG] --package DIR --out DIR" >&2
++    exit 2; }
++foundation=${PS5_NATIVE_FOUNDATION:-$root/.deps/ps5-native-app-boilerplate}
++sdk=$foundation/.deps/native/ps5-payload-sdk
++[[ -x $sdk/bin/prospero-clang ]] || { echo "build_game_app: run tools/build_native.sh first" >&2; exit 2; }
++
++echo "==> Lapy helper for $title_id"
++lapy=$root/.deps/lapy-src
++[[ -d $lapy/.git ]] || git clone -q "$lapy_url" "$lapy"
++git -C "$lapy" fetch -q origin "$lapy_commit" 2>/dev/null || true
++git -C "$lapy" checkout -q --detach "$lapy_commit"
++PS5_PAYLOAD_SDK="$sdk" make -s -C "$lapy" owned-helper TARGET_TITLE="$title_id" \
++    LOGGING_CLIENT="$root/native/ps5log"
++helper=$lapy/build/owned_root_helper-$title_id
++python3 - "$helper/release.json" "$lapy_commit" "$title_id" <<'PY'
++import json, sys
++json.dump({"repo": "mpereiraesaa/PS5-Lapy-JB-Daemon", "tag": "local-build",
++           "commit": sys.argv[2], "target_title": sys.argv[3]}, open(sys.argv[1], "w"), indent=1)
++PY
++
++echo "==> eboot for $title_id (autostart $profile)"
++PW_TITLE_ID=$title_id PW_AUTOSTART_PROFILE=$profile PW_LAPY_DIR=$helper PW_OUTPUT_SUFFIX=-app \
++    "$root/tools/build_native.sh"
++dist=$root/dist/$title_id-app
++
++echo "==> app folder"
++app=$out/$title_id
++mkdir -p "$out"
++rsync -a --delete --exclude=dev.conf "$package/" "$app/"
++cp "$dist/eboot.bin" "$app/eboot.bin"
++cp "$dist/lapy.elf" "$app/lapy.elf"
++chmod 755 "$app/eboot.bin"
++python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" <<'PY'
++import json, re, sys
++template, out, title_id, name, profile = sys.argv[1:]
++param = json.load(open(template))     # keeps attribute3: the high-frame-rate declaration
++label = re.sub(r"[^A-Z0-9]", "", profile.upper())[:13].ljust(13, "0") + "APP"
++param["titleId"] = title_id
++param["conceptId"] = title_id[4:]
++param["contentId"] = f"UP9000-{title_id}_00-{label}"
++param["localizedParameters"] = {"defaultLanguage": "en-US", "en-US": {"titleName": name}}
++json.dump(param, open(out, "w"), indent=2)
++open(out, "a").write("\n")
++PY
++if [[ -n $icon ]]; then
++    python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(24); assert d[:8]==b"\x89PNG\r\n\x1a\n" and struct.unpack(">II",d[16:24])==(512,512), "icon must be a 512x512 PNG"' "$icon"
++    cp "$icon" "$app/sce_sys/icon0.png"
++fi
++echo "build_game_app: $app ($name, starts $profile)"
++sha256sum "$app/eboot.bin" "$app/lapy.elf"
+diff --git a/tools/build_native.sh b/tools/build_native.sh
+index fc4edc8..0906df9 100755
+--- a/tools/build_native.sh
++++ b/tools/build_native.sh
+@@ -39,7 +39,14 @@ wine64_script=${PW_WINE64_SCRIPT:-0}
+ wine64_seconds=${PW_WINE64_SECONDS:-0}
+ wine64_cycles=${PW_WINE64_SCRIPT_CYCLES:-2}
+ wine64_watchdog=${PW_WINE64_WAIT_WATCHDOG:-0}
+-title_id=PPSA99995
++# A game's own app (tools/build_game_app.sh) builds the same title under its own
++# id, starting one profile: PW_TITLE_ID, PW_AUTOSTART_PROFILE, and PW_LAPY_DIR,
++# a Lapy helper built for that id (lapy.elf, lapy-manifest.json, release.json).
++title_id=${PW_TITLE_ID:-PPSA99995}
++autostart_profile=${PW_AUTOSTART_PROFILE:-}
++[[ $title_id =~ ^[A-Z]{4}[0-9]{5}$ ]] || { echo "PW_TITLE_ID must look like PPSA99995" >&2; exit 2; }
++[[ $autostart_profile =~ ^[A-Za-z0-9_.-]*$ ]] || {
++    echo "PW_AUTOSTART_PROFILE must be a profile id" >&2; exit 2; }
+ 
+ [[ $native_mode == wine64 ]] || {
+     echo "PW_NATIVE_MODE must be wine64: the direct Win32 runtime was removed" >&2; exit 2; }
+@@ -55,9 +62,15 @@ title_id=PPSA99995
+ }
+ helper_download=$(mktemp -d "${TMPDIR:-/tmp}/prospero-lapy-helper.XXXXXX")
+ trap 'rm -rf -- "$helper_download"' EXIT
++if [[ -n ${PW_LAPY_DIR:-} ]]; then
++    for asset in lapy.elf lapy-manifest.json release.json; do
++        cp "$PW_LAPY_DIR/$asset" "$helper_download/$asset"
++    done
++else
+ python3 "$root/tools/fetch_lapy_helper.py" \
+     --repo mpereiraesaa/PS5-Lapy-JB-Daemon --tag "$lapy_release" \
+     --sha256 "$lapy_elf_sha256" --out "$helper_download"
++fi
+ lapy_helper_elf="$helper_download/lapy.elf"
+ helper_magic=$(od -An -tx1 -N4 "$lapy_helper_elf" | tr -d ' \n')
+ [[ $helper_magic == 7f454c46 ]] || {
+@@ -150,7 +163,8 @@ common=(-DPW_BUILD_ID=\""$build_id"\" -O2 -Wall -Wextra -Werror -ffunction-secti
+         -I"$root/include" -I"$root/src" -I"$root/native"
+         -I"$root/native/ps5log"
+         -DPW_WINE64_SCRIPT="$wine64_script" -DPW_WINE64_SECONDS="$wine64_seconds"
+-        -DPW_WINE64_SCRIPT_CYCLES="$wine64_cycles" -DPW_WINE64_WAIT_WATCHDOG="$wine64_watchdog")
++        -DPW_WINE64_SCRIPT_CYCLES="$wine64_cycles" -DPW_WINE64_WAIT_WATCHDOG="$wine64_watchdog"
++        -DPW_TITLE_ID=\""$title_id"\" -DPW_AUTOSTART_PROFILE=\""$autostart_profile"\")
+ 
+ sources=(
+     native/wine64_main.c native/pw_diagnostics.c native/pw_audio_ps5.c native/pw_pad_ps5.c native/pw_agc_ps5.c
+-- 
+2.56.0
+

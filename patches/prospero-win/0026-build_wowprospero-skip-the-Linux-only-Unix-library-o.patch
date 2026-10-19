@@ -1,0 +1,51 @@
+From cf59937265d55d0fe737477a9b2035b7aa74b9ab Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 15:29:24 -0500
+Subject: [PATCH] build_wowprospero: skip the Linux-only Unix library on macOS
+
+The Unix side (wowprospero.so) runs only under a Linux host Wine
+(tools/run_wine_dbt_host.sh); its translator uses ELF assembly that
+Mach-O rejects. On macOS the script now says so and builds the PE DLL,
+which is what the release packages. Linux is unchanged.
+---
+ tools/build_wowprospero.sh | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/tools/build_wowprospero.sh b/tools/build_wowprospero.sh
+index 3b4a854..04ba6bd 100755
+--- a/tools/build_wowprospero.sh
++++ b/tools/build_wowprospero.sh
+@@ -58,11 +58,17 @@ out=$(CDPATH= cd -- "$out" && pwd)
+ 
+ dbt="src/pw_x86_engine.c src/pw_x86_block.c src/pw_x86_cache.c src/pw_x86_hostexec.c
+      src/pw_x86_reencode.c src/pw_x87.c src/pw_guest_fp.c src/pw_vm.c src/pw_vm_posix.c"
++# The Unix side only runs under a Linux host Wine (tools/run_wine_dbt_host.sh): its
++# translator uses ELF assembly. On macOS it is skipped; the release takes the PE DLL.
++if [ "$(uname -s)" = Darwin ]; then
++    echo "build_wowprospero: Unix library skipped on macOS (Linux host Wine only)"
++else
+ (cd "$root" && gcc -m64 -O2 -g -fPIC -shared -Wl,-Bsymbolic -Wl,-soname,wowprospero.so \
+     -Wl,-z,defs -D__WINESRC__ -DWINE_UNIX_LIB -D_REENTRANT \
+     -I"$module" -I"$build_dir/include" -I"$source_dir/include" -Isrc -Iinclude \
+     "$module/unix.c" $dbt "$build_dir/dlls/ntdll/ntdll.so" -o "$out/wowprospero.so") ||
+     fail "Unix library build failed"
++fi
+ 
+ x86_64-w64-mingw32-gcc -c -o "$out/x86_64-windows/cpu.o" "$module/cpu.c" \
+     -I"$module" -I"$build_dir/include" -I"$source_dir/include" -I"$source_dir/include/msvcrt" \
+@@ -81,10 +87,10 @@ x86_64-w64-mingw32-gcc -c -o "$out/x86_64-windows/cpu.o" "$module/cpu.c" \
+ 
+ # Installed Wine resolves a builtin PE's Unix side under x86_64-unix.
+ # Keep the build-tree layout too, and let WINEDLLPATH select isolated builds.
+-if [ -n "$output_dir" ]; then
++if [ -n "$output_dir" ] && [ -f "$out/wowprospero.so" ]; then
+     mkdir -p "$out/x86_64-unix"
+     ln -sf ../wowprospero.so "$out/x86_64-unix/wowprospero.so"
+ fi
+ 
+ echo "build_wowprospero: $out/x86_64-windows/wowprospero.dll"
+-echo "build_wowprospero: $out/wowprospero.so"
++[ ! -f "$out/wowprospero.so" ] || echo "build_wowprospero: $out/wowprospero.so"
+-- 
+2.56.0
+

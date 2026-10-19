@@ -1,0 +1,62 @@
+From 5fea3755b2cf44faf44382b265936e6e381db6f4 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 16:19:45 -0500
+Subject: [PATCH 23/24] Close games with Options+Touchpad, not Options+Create
+
+Create is the DualSense screenshot button, so the old hold-to-quit
+combo saved a capture every time. Touchpad click is not a system
+shortcut and is unused in XInput games like MW.
+---
+ native/wine64_main.c     | 8 +++++---
+ src/pw_launcher_render.c | 2 +-
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 27e3352..112feb4 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -5,7 +5,7 @@
+  * The title runs one game per process (src/pw_wine_launch.h). Started with
+  * no game it shows the launcher, without loading Wine; choosing a game
+  * restarts the title with sceSystemServiceLoadExec and the game's
+- * arguments. Holding Options+Create in a game sends it Alt+F4; when Wine
++ * arguments. Holding Options+Touchpad in a game sends it Alt+F4; when Wine
+  * exits, or the game does not close in time, the title restarts into the
+  * launcher.
+  *
+@@ -244,7 +244,9 @@ enum { PW_WINE64_MAX_FRAME = 1920 * 1200 * 4, PW_WINE64_TICK_US = 16000,
+ 
+ enum { PAD_CREATE = 0x1u, PAD_OPTIONS = 0x8u, PAD_UP = 0x10u, PAD_RIGHT = 0x20u,
+        PAD_DOWN = 0x40u, PAD_LEFT = 0x80u, PAD_L1 = 0x400u, PAD_R1 = 0x800u,
+-       PAD_CROSS = 0x4000u, PAD_SQUARE = 0x8000u, PAD_CLOSE = PAD_OPTIONS | PAD_CREATE };
++       PAD_CROSS = 0x4000u, PAD_SQUARE = 0x8000u, PAD_TOUCHPAD = 0x100000u,
++       /* Create is the PS5 screenshot button; Options+Touchpad does not fire it. */
++       PAD_CLOSE = PAD_OPTIONS | PAD_TOUCHPAD };
+ /* The pad core needs a key map to open; the title reads raw edges and maps
+  * them with the game's bindings (pw_game_profile). */
+ static const PwPadKeyMap pad_open_map[] = { { PAD_CROSS, 0x20, 0, 0, "cross" } };
+@@ -1443,7 +1445,7 @@ int main(int argc, char **argv)
+         }
+         if (!presented) usleep(PW_WINE64_TICK_US);
+ 
+-        /* Closing: Options+Create held for a second, or the deadline, asks
++        /* Closing: Options+Touchpad held for a second, or the deadline, asks
+          * the game to close with Alt+F4; Wine's exit then restarts the
+          * title (on_exit_report). A game that does not close is left. */
+         if (pad_status == PW_OK && (pad.core.pressed_edges & PAD_CREATE) &&
+diff --git a/src/pw_launcher_render.c b/src/pw_launcher_render.c
+index e1697f3..63cb421 100644
+--- a/src/pw_launcher_render.c
++++ b/src/pw_launcher_render.c
+@@ -257,7 +257,7 @@ static void taskbar(const Canvas *c,const char *status)
+         for(int32_t i=0;i<bw;i++)if(!cut(i+30,j,bw+30,bh,30))put(c,i,TASKBAR_Y+6+j,color);
+     }
+     text(c,(bw-text_width("Play",6))/2,TASKBAR_Y+6+(bh-42)/2,"Play",6,rgb(0xff,0xff,0xff),bw);
+-    int32_t hints=text(c,bw+48,TASKBAR_Y+30,"Cross: launch   Options+Create (hold): close",3,
++    int32_t hints=text(c,bw+48,TASKBAR_Y+30,"Cross: launch   Options+Touchpad (hold): close",3,
+                        rgb(0xff,0xff,0xff),W-bw-96);
+     if(status && *status) {
+         int32_t tray=W-(bw+48+hints+48);
+-- 
+2.56.0
+

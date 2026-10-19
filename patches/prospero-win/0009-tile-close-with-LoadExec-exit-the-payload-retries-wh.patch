@@ -1,0 +1,84 @@
+From 551046371821e8729088462e17ccc193f982876c Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 19:27:21 -0500
+Subject: [PATCH 09/24] tile: close with LoadExec("exit"); the payload retries
+ while the mount is busy
+
+On the console the payload's launch calls were refused (0x80940033) while
+ShadowMount+ could not mount PPSA99995 ("Device busy": the tile's sandbox
+was still being removed), and the tile died with SIGSYS returning from
+main. The tile now closes as titles do, and the payload waits 1.5 s, then
+retries the launch once a second for up to 15 s.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/tile/pw_tile_launch.c | 28 +++++++++++++++++++---------
+ native/tile/pw_tile_main.c   |  6 +++++-
+ 2 files changed, 24 insertions(+), 10 deletions(-)
+
+diff --git a/native/tile/pw_tile_launch.c b/native/tile/pw_tile_launch.c
+index 27cfcf7..7371362 100644
+--- a/native/tile/pw_tile_launch.c
++++ b/native/tile/pw_tile_launch.c
+@@ -120,16 +120,26 @@ int main(void)
+         { "lncUtil/login", sceLncUtilLaunchApp, login },
+         { "systemService/login", sceSystemServiceLaunchApp, login },
+     };
+-    for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]); i++) {
+-        if (attempts[i].user_id < 0) continue;
+-        lnc_app_param_t param;
+-        memset(&param, 0, sizeof(param));
+-        param.size = (uint32_t)sizeof(param);
+-        param.user_id = attempts[i].user_id;
+-        int rc = attempts[i].call(target, argv, &param);
+-        log_line("payload: %s user %d -> 0x%08x", attempts[i].name, attempts[i].user_id, (unsigned)rc);
+-        if (rc == 0) break;
++    /* While the tile's sandbox is still being removed, ShadowMount+ cannot
++     * mount the target ("launch mount unavailable: Device busy") and the
++     * launch is refused (0x80940033): give it a moment, then keep asking. */
++    usleep(1500000);
++    int started = 0;
++    for (int round = 1; round <= 15 && !started; round++) {
++        for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]) && !started; i++) {
++            if (attempts[i].user_id < 0) continue;
++            lnc_app_param_t param;
++            memset(&param, 0, sizeof(param));
++            param.size = (uint32_t)sizeof(param);
++            param.user_id = attempts[i].user_id;
++            int rc = attempts[i].call(target, argv, &param);
++            log_line("payload: round %d %s user %d -> 0x%08x", round, attempts[i].name,
++                     attempts[i].user_id, (unsigned)rc);
++            started = rc == 0;
++        }
++        if (!started) usleep(1000000);
+     }
++    log_line("payload: %s", started ? "started" : "gave up");
+     if (log_file) fclose(log_file);
+     return 0;
+ }
+diff --git a/native/tile/pw_tile_main.c b/native/tile/pw_tile_main.c
+index debb0c7..f313b98 100644
+--- a/native/tile/pw_tile_main.c
++++ b/native/tile/pw_tile_main.c
+@@ -34,6 +34,7 @@ int sceNetSetsockopt(int, int, int, const void *, socklen_t);
+ int sceNetShutdown(int, int);
+ int sceNetSocket(const char *, int, int, int);
+ int sceNetSocketClose(int);
++int sceSystemServiceLoadExec(const char *path, char *const argv[]);
+ 
+ #define TILE_LOADER_PORT 9021
+ #define TILE_TIMEOUT_US 5000000
+@@ -152,6 +153,9 @@ int main(void)
+     log_line("tile: %s asks for %s profile=%s home=1", tile, target, profile);
+     if (send_payload() != 0) unlink(tile_paths[TILE_REQUEST]);
+     if (log_file) fclose(log_file);
+-    /* Closing hands the console back; the payload starts the game. */
++    /* Close the way a title does (returning from main ends in a system call
++     * the sandbox refuses: SIGSYS); the payload starts the game once the
++     * tile is gone. */
++    sceSystemServiceLoadExec("exit", NULL);
+     return 0;
+ }
+-- 
+2.56.0
+

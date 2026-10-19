@@ -1,0 +1,31 @@
+From f663385c6e871c5bc856fffc7cb668cf379c74d3 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 20:26:32 -0500
+Subject: [PATCH 16/24] build_game_app: declare pubtools.loudnessSnd0 with the
+ music
+
+The console registered snd0.at9 but stayed silent; every title whose
+music plays declares pubtools.loudnessSnd0 in param.json.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ tools/build_game_app.sh | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index 63d109a..69e8334 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -105,6 +105,9 @@ fi
+ if [[ -n $music ]]; then
+     python3 -c 'import sys; d=open(sys.argv[1],"rb").read(24); assert d[:4]==b"RIFF" and d[8:12]==b"WAVE" and d[20:22]==b"\xfe\xff", "music must be an ATRAC9 RIFF/WAVE (snd0.at9)"' "$music"
+     cp "$music" "$app/sce_sys/snd0.at9"
++    # The Shell plays snd0.at9 only with its loudness declared, as every title that
++    # has music carries it (prepare-assets.sh normalizes excerpts to -28 LUFS).
++    python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); p.setdefault("pubtools",{})["loudnessSnd0"]="-28.00"; json.dump(p,open(sys.argv[1],"w"),indent=2); open(sys.argv[1],"a").write("\n")' "$app/sce_sys/param.json"
+ fi
+ echo "build_game_app: $app ($name, starts $profile)"
+ sha256sum "$app/eboot.bin" "$app/lapy.elf"
+-- 
+2.56.0
+

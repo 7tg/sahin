@@ -1,0 +1,31 @@
+From d1460b28ec2a8664b45d93373dd9965b2c0ce0e7 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 19:33:04 -0500
+Subject: [PATCH 3/3] wsi/videoout: take attribute3 bit 0x40 alone as the
+ high-frame-rate declaration
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01A9xZzd6eUvy4WLFbfGr4Yi
+---
+ src/vulkan/wsi/wsi_common_videoout.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/vulkan/wsi/wsi_common_videoout.c b/src/vulkan/wsi/wsi_common_videoout.c
+index 0ec58d764cb..31439eb7edc 100644
+--- a/src/vulkan/wsi/wsi_common_videoout.c
++++ b/src/vulkan/wsi/wsi_common_videoout.c
+@@ -335,7 +335,10 @@ videoout_title_declares_high_frame_rate(void)
+    if (at == NULL || (at = strchr(at, ':')) == NULL)
+       return false;
+    const unsigned long value = strtoul(at + 1, NULL, 0);
+-   return (value & VIDEOOUT_ATTRIBUTE3_HIGH_FRAME_RATE) == VIDEOOUT_ATTRIBUTE3_HIGH_FRAME_RATE;
++   /* 0x40 alone is what the console needs to grant 119.88 Hz; prospero-win
++    * declares only that, because 0x80000 as well left frames unpaced (its
++    * WINE_PS5_BUILD.md). The output's own answer below still decides. */
++   return (value & 0x40u) != 0;
+ }
+ 
+ /* The refresh period: the median of a few intervals between vblank waits,
+-- 
+2.56.0
+

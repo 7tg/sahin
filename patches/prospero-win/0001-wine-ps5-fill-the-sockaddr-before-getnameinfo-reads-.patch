@@ -1,0 +1,30 @@
+From 6876bc7b6b2bf70d30ad915ef7e5f5bd2c8fd877 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 18:37:49 -0500
+Subject: [PATCH 01/24] wine/ps5: fill the sockaddr before getnameinfo reads it
+ (clang 23 -Wuninitialized-const-pointer)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01A9xZzd6eUvy4WLFbfGr4Yi
+(cherry picked from commit 50e2cb5b2a53ad5b3626570dae3505c2783d5fec)
+---
+ wine/ps5/pw_ws2_32_libc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/wine/ps5/pw_ws2_32_libc.c b/wine/ps5/pw_ws2_32_libc.c
+index 38111d8..eb8ad15 100644
+--- a/wine/ps5/pw_ws2_32_libc.c
++++ b/wine/ps5/pw_ws2_32_libc.c
+@@ -487,7 +487,8 @@ struct hostent *gethostbyaddr(const void *address, socklen_t length, int family)
+         return NULL;
+     }
+     memcpy(answer.bytes, address, length);
+-    if (getnameinfo((struct sockaddr *)&storage, pw_sockaddr(&storage, &answer, 0), name, sizeof(name),
++    socklen_t storage_length = pw_sockaddr(&storage, &answer, 0);
++    if (getnameinfo((struct sockaddr *)&storage, storage_length, name, sizeof(name),
+                     NULL, 0, NI_NAMEREQD)) {
+         pw_h_errno = HOST_NOT_FOUND;
+         return NULL;
+-- 
+2.56.0
+

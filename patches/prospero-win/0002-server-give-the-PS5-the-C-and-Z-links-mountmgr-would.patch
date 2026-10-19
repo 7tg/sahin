@@ -1,0 +1,65 @@
+From 0816b517e3366abe3e28bcbf9cec8e5401464ccd Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 19:04:58 -0500
+Subject: [PATCH 02/24] server: give the PS5 the C: and Z: links mountmgr would
+ create
+
+The console cannot start winedevice.exe, so mountmgr never runs and
+\??\ has no drive letters: GetLogicalDrives returns 0. Need for Speed:
+Most Wanted (2005) builds its drive list from it and initialises a lock in
+a NULL drive object at startup (write to 0x2c). Every prefix has exactly
+C: and Z:, so the in-process server creates their links itself.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01A9xZzd6eUvy4WLFbfGr4Yi
+(cherry picked from commit dac711c9facfaf3c8d22a7fea741f6325c9a610e)
+---
+ .../0871-server-ps5-drive-letter-links.patch  | 36 +++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 wine/patches/0871-server-ps5-drive-letter-links.patch
+
+diff --git a/wine/patches/0871-server-ps5-drive-letter-links.patch b/wine/patches/0871-server-ps5-drive-letter-links.patch
+new file mode 100644
+index 0000000..91f2ff7
+--- /dev/null
++++ b/wine/patches/0871-server-ps5-drive-letter-links.patch
+@@ -0,0 +1,36 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: prospero-win <prospero-win@invalid>
++Subject: [PATCH] server: Give the PS5 the C: and Z: links mountmgr would create.
++
++diff --git a/server/directory.c b/server/directory.c
++index 2b9d03edc0e..df199c0ee74 100644
++--- a/server/directory.c
+++++ b/server/directory.c
++@@ -466,6 +466,27 @@ void init_directories( struct fd *intl_fd )
++     release_object( create_symlink( &dir_global->obj, link_conin_str, OBJ_PERMANENT, link_currentin_str, NULL ));
++     release_object( create_symlink( &dir_global->obj, link_conout_str, OBJ_PERMANENT, link_currentout_str, NULL ));
++     release_object( create_symlink( &dir_global->obj, link_con_str, OBJ_PERMANENT, link_console_str, NULL ));
+++#ifdef __PROSPERO__
+++    /* No mountmgr runs on the PS5, which cannot start winedevice.exe, so
+++     * nothing creates the drive letters' links here: GetLogicalDrives then
+++     * reports no drives, and games that enumerate them (Need for Speed: Most
+++     * Wanted 2005 among them) fail to start. Every prefix has exactly C: and
+++     * Z: (dosdevices/c: -> ../drive_c, z: -> /); give them the links mountmgr
+++     * would. Paths keep resolving through dosdevices as before. */
+++    {
+++        static const WCHAR drive_cW[] = {'C',':'};
+++        static const WCHAR drive_zW[] = {'Z',':'};
+++        static const WCHAR volume_cW[] = {'\\','D','e','v','i','c','e','\\','H','a','r','d','d','i','s','k','V','o','l','u','m','e','1'};
+++        static const WCHAR volume_zW[] = {'\\','D','e','v','i','c','e','\\','H','a','r','d','d','i','s','k','V','o','l','u','m','e','2'};
+++        static const struct unicode_str drive_c_str = {drive_cW, sizeof(drive_cW)};
+++        static const struct unicode_str drive_z_str = {drive_zW, sizeof(drive_zW)};
+++        static const struct unicode_str volume_c_str = {volume_cW, sizeof(volume_cW)};
+++        static const struct unicode_str volume_z_str = {volume_zW, sizeof(volume_zW)};
+++
+++        release_object( create_symlink( &dir_global->obj, drive_c_str, OBJ_PERMANENT, volume_c_str, NULL ));
+++        release_object( create_symlink( &dir_global->obj, drive_z_str, OBJ_PERMANENT, volume_z_str, NULL ));
+++    }
+++#endif
++ 
++     /* events */
++     for (i = 0; i < ARRAY_SIZE( kernel_events ); i++)
+-- 
+2.56.0
+

@@ -1,0 +1,148 @@
+From 3b4242b496c018877a39e67f47bf46de72df8bcb Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 15:15:51 -0500
+Subject: [PATCH 1/2] [dxvk] Use 32-bit reference and use counters for paged
+ resources and samplers
+
+Port of 5fde742b (2.6.2-prospero1) to 3.1.1. On i386, 64-bit atomics compile
+to lock cmpxchg8b retry loops, and resource and sampler reference counts are
+touched on every bind. DxvkPagedResource keeps a 32-bit reference count and a
+32-bit use counter; plain references only touch the former. 3.x adds
+DxvkAccess::Move, so the use counter has three fields (reads in bits 0-9,
+writes 10-20, moves 21-31) ordered so isInUse() still compares against one
+increment. DxvkSampler gets a 32-bit reference count.
+
+The constant-copy half of 5fde742b is dropped: 3.x already compares and
+copies shader constant registers with inline SSE.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ src/dxvk/dxvk_sampler.h |  4 +++-
+ src/dxvk/dxvk_sparse.h  | 49 +++++++++++++++++++++++++++++++----------
+ 2 files changed, 40 insertions(+), 13 deletions(-)
+
+diff --git a/src/dxvk/dxvk_sampler.h b/src/dxvk/dxvk_sampler.h
+index 239237de..8a9a9fe2 100644
+--- a/src/dxvk/dxvk_sampler.h
++++ b/src/dxvk/dxvk_sampler.h
+@@ -223,7 +223,9 @@ namespace dxvk {
+ 
+   private:
+     
+-    std::atomic<uint64_t> m_refCount  = { 0u };
++    // 32-bit so 32-bit builds use locked add/sub instead of cmpxchg8b loops;
++    // a reference count cannot exceed 32 bits in a 32-bit address space.
++    std::atomic<uint32_t> m_refCount  = { 0u };
+     uint64_t              m_trackingId = 0u;
+ 
+     DxvkSamplerPool*      m_pool      = nullptr;
+diff --git a/src/dxvk/dxvk_sparse.h b/src/dxvk/dxvk_sparse.h
+index 1dd7ab80..c1c9c688 100644
+--- a/src/dxvk/dxvk_sparse.h
++++ b/src/dxvk/dxvk_sparse.h
+@@ -479,7 +479,14 @@ namespace dxvk {
+      * as well as the use count for the given access.
+      */
+     force_inline void acquire(DxvkAccess access) {
+-      m_useCount.fetch_add(getIncrement(access));
++      // The reference count and the read/write use counts live in two
++      // 32-bit words rather than one packed 64-bit word, so that 32-bit
++      // builds use locked add/sub instead of cmpxchg8b retry loops. Plain
++      // references, by far the most common, only touch the reference count.
++      if (access != DxvkAccess::None)
++        m_useCount.fetch_add(getUseIncrement(access));
++
++      m_refCount.fetch_add(1u);
+     }
+ 
+     /**
+@@ -489,10 +496,12 @@ namespace dxvk {
+      * as well as the use count for the given access.
+      */
+     force_inline void release(DxvkAccess access) {
+-      uint64_t increment = getIncrement(access);
+-      uint64_t remaining = m_useCount.fetch_sub(increment);
++      if (access != DxvkAccess::None)
++        m_useCount.fetch_sub(getUseIncrement(access));
+ 
+-      if (unlikely(remaining == increment))
++      // Every access reference also holds a plain reference, so the
++      // resource dies exactly when the last reference is gone.
++      if (unlikely(m_refCount.fetch_sub(1u) == 1u))
+         delete this;
+     }
+ 
+@@ -503,7 +512,9 @@ namespace dxvk {
+      * \param [in] to New access type
+      */
+     force_inline void convertRef(DxvkAccess from, DxvkAccess to) {
+-      uint64_t increment = getIncrement(to) - getIncrement(from);
++      // Unsigned wrap-around keeps this one atomic update even when a
++      // reference moves between the read and write fields.
++      uint32_t increment = getUseIncrement(to) - getUseIncrement(from);
+ 
+       if (increment)
+         m_useCount.fetch_add(increment);
+@@ -520,7 +531,10 @@ namespace dxvk {
+      * \returns \c true if the resource is in use
+      */
+     force_inline bool isInUse(DxvkAccess access) const {
+-      return m_useCount.load() >= getIncrement(access);
++      if (access == DxvkAccess::None)
++        return m_refCount.load() != 0u;
++
++      return m_useCount.load() >= getUseIncrement(access);
+     }
+ 
+     /**
+@@ -533,13 +547,12 @@ namespace dxvk {
+      * \returns \c true on success
+      */
+     Rc<DxvkPagedResource> tryAcquire() {
+-      uint64_t increment = getIncrement(DxvkAccess::None);
+-      uint64_t refCount = m_useCount.load();
++      uint32_t refCount = m_refCount.load();
+ 
+       do {
+         if (!refCount)
+           return nullptr;
+-      } while (!m_useCount.compare_exchange_strong(refCount, refCount + increment));
++      } while (!m_refCount.compare_exchange_strong(refCount, refCount + 1u));
+ 
+       return Rc<DxvkPagedResource>::unsafeCreate(this);
+     }
+@@ -722,7 +735,14 @@ namespace dxvk {
+ 
+   private:
+ 
+-    std::atomic<uint64_t> m_useCount = { 0u };
++    // Total number of references, including access references
++    std::atomic<uint32_t> m_refCount = { 0u };
++    // Access references by type: reads in bits 0-9, writes in bits 10-20,
++    // moves in bits 21-31, each field above the ones it implies, so that
++    // isInUse() still compares against one increment. Access references come
++    // only from command list tracking, at most one per access type and command
++    // list, so a field counts command lists in flight and cannot overflow.
++    std::atomic<uint32_t> m_useCount = { 0u };
+     uint64_t              m_trackId = { 0u };
+     uint64_t              m_cookie = { 0u };
+ 
+@@ -732,8 +752,13 @@ namespace dxvk {
+ 
+     void makeResourceResident();
+ 
+-    static constexpr uint64_t getIncrement(DxvkAccess access) {
+-      return uint64_t(1u) << (uint32_t(access) * 20u);
++    static constexpr uint32_t getUseIncrement(DxvkAccess access) {
++      switch (access) {
++        case DxvkAccess::Read:  return 1u;
++        case DxvkAccess::Write: return 1u << 10u;
++        case DxvkAccess::Move:  return 1u << 21u;
++        default:                return 0u;
++      }
+     }
+ 
+     static std::atomic<uint64_t> s_cookie;
+-- 
+2.56.0
+

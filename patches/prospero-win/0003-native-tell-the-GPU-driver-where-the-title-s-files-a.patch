@@ -1,0 +1,43 @@
+From 4d5a25bf960790236a2aa47318d4a5bced12db26 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 7 Oct 2026 19:21:35 -0500
+Subject: [PATCH 03/24] native: tell the GPU driver where the title's files are
+ (PS5_APP0)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01A9xZzd6eUvy4WLFbfGr4Yi
+(cherry picked from commit d90acb52fc057531292f995a6a3bce250a37b429)
+---
+ native/wine64_main.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 65a2111..7112263 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -1127,13 +1127,21 @@ int main(int argc, char **argv)
+         else if (words) PS5LOG_LOG("PW_WINE64 arguments words=%d line=%s", words, game->app.arguments);
+     }
+ 
++    const char *app_root = runtime_roots[0];
+     for (size_t i = 0; i < sizeof(runtime_roots) / sizeof(runtime_roots[0]); i++) {
+         struct stat st;
+         snprintf(ntdll_dir, sizeof(ntdll_dir), "%s" PW_WINE64_RUNTIME, runtime_roots[i]);
+         snprintf(ntdll_path, sizeof(ntdll_path), "%s/ntdll.prx", ntdll_dir);
+-        if (stat(ntdll_path, &st) == 0) break;
++        if (stat(ntdll_path, &st) == 0) {
++            app_root = runtime_roots[i];
++            break;
++        }
+         PS5LOG_LOG("PW_WINE64 runtime not at %s", ntdll_dir);
+     }
++    /* Where this process sees the title's files: once /data is granted /app0
++     * is gone, and the GPU driver reads sce_sys/param.json (whether the title
++     * may present at 119.88 Hz) through this instead. */
++    setenv("PS5_APP0", app_root, 1);
+     PS5LOG_LOG("PW_WINE64 ntdll=%s prefix=%s exe=%s", config.ntdll_path, config.prefix,
+                launch.executable);
+     {
+-- 
+2.56.0
+

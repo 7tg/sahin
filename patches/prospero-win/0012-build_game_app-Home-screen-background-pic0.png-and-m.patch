@@ -1,0 +1,63 @@
+From 822201695ce864cfffadc4228144038355cb76da Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 19:53:51 -0500
+Subject: [PATCH 12/24] build_game_app: Home-screen background (pic0.png) and
+ music (snd0.at9) options
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ tools/build_game_app.sh | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index 8f6ffc9..8181a4d 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -11,22 +11,27 @@
+ #              (the title id also names the sandbox path the runtime is read from);
+ #   lapy.elf   the Lapy helper built for this title id: a helper only elevates
+ #              the title it was built for (PS5-Lapy-JB-Daemon, TARGET_TITLE);
+-#   sce_sys/   param.json with the id and name, and the icon.
++#   sce_sys/   param.json with the id and name, the icon (icon0.png, 512x512),
++#              and optionally the Home-screen background (pic0.png, 3840x2160)
++#              and music (snd0.at9: ATRAC9 48 kHz stereo, as the console's own
++#              titles carry; no open-source encoder exists, so it is supplied).
+ #
+ #   tools/build_game_app.sh --title-id PPSA99996 --name "NFS Most Wanted" \
+-#       --profile nfs-most-wanted-2005 [--icon art.png] \
++#       --profile nfs-most-wanted-2005 [--icon art.png] [--background bg.png] [--music snd0.at9] \
+ #       --package ../release-main/PPSA99995 --out ../release-main/apps
+ set -euo pipefail
+ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ lapy_url=https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git
+ lapy_commit=b48b7d7236eca25c7b9dfd6c040c763ae05dde80   # v0.3.2-experimental, as build_native.sh fetches
+-title_id= name= profile= icon= package= out=
++title_id= name= profile= icon= background= music= package= out=
+ while [[ $# -gt 0 ]]; do
+     case $1 in
+     --title-id) title_id=$2; shift 2 ;;
+     --name) name=$2; shift 2 ;;
+     --profile) profile=$2; shift 2 ;;
+     --icon) icon=$2; shift 2 ;;
++    --background) background=$2; shift 2 ;;
++    --music) music=$2; shift 2 ;;
+     --package) package=$2; shift 2 ;;
+     --out) out=$2; shift 2 ;;
+     *) echo "build_game_app: unknown argument $1" >&2; exit 2 ;;
+@@ -82,5 +87,13 @@ if [[ -n $icon ]]; then
+     python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(24); assert d[:8]==b"\x89PNG\r\n\x1a\n" and struct.unpack(">II",d[16:24])==(512,512), "icon must be a 512x512 PNG"' "$icon"
+     cp "$icon" "$app/sce_sys/icon0.png"
+ fi
++if [[ -n $background ]]; then
++    python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(26); assert d[:8]==b"\x89PNG\r\n\x1a\n" and struct.unpack(">II",d[16:24])==(3840,2160) and d[25]==2, "background must be a 3840x2160 RGB PNG"' "$background"
++    cp "$background" "$app/sce_sys/pic0.png"
++fi
++if [[ -n $music ]]; then
++    python3 -c 'import sys; d=open(sys.argv[1],"rb").read(24); assert d[:4]==b"RIFF" and d[8:12]==b"WAVE" and d[20:22]==b"\xfe\xff", "music must be an ATRAC9 RIFF/WAVE (snd0.at9)"' "$music"
++    cp "$music" "$app/sce_sys/snd0.at9"
++fi
+ echo "build_game_app: $app ($name, starts $profile)"
+ sha256sum "$app/eboot.bin" "$app/lapy.elf"
+-- 
+2.56.0
+

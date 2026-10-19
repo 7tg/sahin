@@ -1,0 +1,144 @@
+From 25ac8b6b677df30de85407538d85ab2441a10cdb Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 13:07:33 -0500
+Subject: [PATCH 17/24] Find the app's sandbox instance; build_game_app --logo
+
+wine64_main: the sandbox view of app0 was always /mnt/sandbox/<title>_000.
+After an app crashed on exit the console kept that instance (empty) until a
+restart, the next launch got _001, and every launch failed with ntdll.prx
+not found. find_sandbox_app0() now takes the first instance holding the
+runtime, for the runtime, the Zink provider, the CPU and restarts.
+
+build_game_app: --logo writes sce_sys/pic2.dds from a 3840x2160 RGBA PNG
+(BC7, straight alpha, as the console's titles carry).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c    | 37 ++++++++++++++++++++++++++++++++++---
+ tools/build_game_app.sh | 18 ++++++++++++++++--
+ 2 files changed, 50 insertions(+), 5 deletions(-)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 67938cc..8e68994 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -75,8 +75,14 @@
+ #define PW_WINE64_RUNTIME "/win/wine/lib/wine/x86_64-unix"
+ /* Its 64-bit PE modules, among them the WoW64 CPU backends. */
+ #define PW_WINE64_PE_RUNTIME "/win/wine/lib/wine/x86_64-windows"
+-#define PW_SANDBOX_APP0 "/mnt/sandbox/" PW_TITLE_ID "_000/app0"
+-static const char *const runtime_roots[] = { "/app0", PW_SANDBOX_APP0 };
++/* The sandbox's view of app0 is /mnt/sandbox/<title>_NNN/app0, NNN the
++ * instance: 000 normally, but an instance that ended badly (a crash on exit)
++ * keeps 000 until the console restarts, empty, and the next launch gets 001
++ * (measured: every launch then failed with ntdll.prx not found). The first
++ * instance that holds the runtime is this one (find_sandbox_app0). */
++#define PW_SANDBOX_INSTANCES 16
++static char sandbox_app0[64] = "/mnt/sandbox/" PW_TITLE_ID "_000/app0";
++static const char *const runtime_roots[] = { "/app0", sandbox_app0 };
+ /* The title's data: profiles/, input/, prefix/ and prefixes/<name>. */
+ #define PW_WINE64_ROOT_DATA "/data/prospero-win"            /* when /data is granted */
+ #define PW_WINE64_ROOT_SANDBOX "/download0/prospero-win"    /* sandbox fallback */
+@@ -608,6 +614,26 @@ static int capture_fd(int fd, PwFdForward *forward)
+     return pthread_create(&thread, NULL, forward_fd, forward) ? -4 : 0;
+ }
+ 
++/* Point sandbox_app0 at this instance once /mnt/sandbox is visible (after
++ * the helper grants /data); before that, or if none holds the runtime, it
++ * stays at 000 and /app0 is tried first anyway. */
++static void find_sandbox_app0(void)
++{
++    static int found;
++
++    for (int i = 0; !found && i < PW_SANDBOX_INSTANCES; i++) {
++        char root[sizeof(sandbox_app0)], ntdll[sizeof(root) + sizeof(PW_WINE64_RUNTIME) + 16];
++        struct stat st;
++
++        snprintf(root, sizeof(root), "/mnt/sandbox/" PW_TITLE_ID "_%03d/app0", i);
++        snprintf(ntdll, sizeof(ntdll), "%s" PW_WINE64_RUNTIME "/ntdll.prx", root);
++        if (stat(ntdll, &st) != 0) continue;
++        snprintf(sandbox_app0, sizeof(sandbox_app0), "%s", root);
++        found = 1;
++        if (i) PS5LOG_LOG("PW_WINE64 sandbox instance=%03d (an earlier one was left behind)", i);
++    }
++}
++
+ /* ---- one game per process -------------------------------------------- */
+ 
+ static PwWineLaunch launch;
+@@ -619,7 +645,11 @@ static PwWineLaunch launch;
+  * instead of going to the launcher. */
+ static void restart_title(const PwWineApp *app, uint32_t cycle, const char *reason)
+ {
+-    static const char *const eboots[] = { "/app0/eboot.bin", PW_SANDBOX_APP0 "/eboot.bin" };
++    char sandbox_eboot[sizeof(sandbox_app0) + 16];
++    const char *const eboots[] = { "/app0/eboot.bin", sandbox_eboot };
++
++    find_sandbox_app0();
++    snprintf(sandbox_eboot, sizeof(sandbox_eboot), "%s/eboot.bin", sandbox_app0);
+     static char storage[2 * PW_WINE_LAUNCH_PATH_MAX + 64];
+     char *next[PW_WINE_LAUNCH_ARGS];
+ 
+@@ -982,6 +1012,7 @@ int main(int argc, char **argv)
+         ps5log_close("data-helper-incomplete");
+         return 1;
+     }
++    find_sandbox_app0();
+     (void)pw_wine_launch_parse(argc, argv, catalog, catalog_count, &launch);
+     static const char autostart_profile[] = PW_AUTOSTART_PROFILE;
+     if (launch.mode != PW_WINE_LAUNCH_GAME && !launch.refused && autostart_profile[0] != '\0') {
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index 69e8334..daae935 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -16,17 +16,19 @@
+ #              textures pic0.dds (tile selected) and pic1.dds (launch), 3840x2160,
+ #              made by ps5-vulkan-mp's tools/prepare-assets.sh (bc7enc_rdo; build it
+ #              once with make -C ../ps5-vulkan-mp assets-deps); pic0.png is kept too,
++#              the title logo (pic2.dds: a 3840x2160 layer the Shell draws over the
++#              background, transparent but for the logo, as the console's titles have),
+ #              and music (snd0.at9: ATRAC9 48 kHz stereo, as the console's own
+ #              titles carry; no open-source encoder exists, so it is supplied).
+ #
+ #   tools/build_game_app.sh --title-id PPSA99996 --name "NFS Most Wanted" \
+-#       --profile nfs-most-wanted-2005 [--icon art.png] [--background bg.png] [--music snd0.at9] \
++#       --profile nfs-most-wanted-2005 [--icon art.png] [--background bg.png] [--logo logo.png] [--music snd0.at9] \
+ #       --package ../release-main/PPSA99995 --out ../release-main/apps
+ set -euo pipefail
+ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ lapy_url=https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git
+ lapy_commit=b48b7d7236eca25c7b9dfd6c040c763ae05dde80   # v0.3.2-experimental, as build_native.sh fetches
+-title_id= name= profile= icon= background= music= package= out=
++title_id= name= profile= icon= background= logo= music= package= out=
+ while [[ $# -gt 0 ]]; do
+     case $1 in
+     --title-id) title_id=$2; shift 2 ;;
+@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
+     --profile) profile=$2; shift 2 ;;
+     --icon) icon=$2; shift 2 ;;
+     --background) background=$2; shift 2 ;;
++    --logo) logo=$2; shift 2 ;;
+     --music) music=$2; shift 2 ;;
+     --package) package=$2; shift 2 ;;
+     --out) out=$2; shift 2 ;;
+@@ -102,6 +105,17 @@ if [[ -n $background ]]; then
+     cp "$textures/pic0.dds" "$textures/pic1.dds" "$app/sce_sys/"
+     rm -rf -- "$textures"
+ fi
++if [[ -n $logo ]]; then
++    python3 -c 'import struct,sys; d=open(sys.argv[1],"rb").read(26); assert d[:8]==b"\x89PNG\r\n\x1a\n" and struct.unpack(">II",d[16:24])==(3840,2160) and d[25]==6, "logo must be a 3840x2160 RGBA PNG"' "$logo"
++    bc7enc=${PS5_BC7ENC:-$root/../ps5-vulkan-mp/.deps/native/bc7enc_rdo/build/bc7enc}
++    [[ -x $bc7enc ]] || { echo "build_game_app: no $bc7enc (make -C ../ps5-vulkan-mp assets-deps)" >&2; exit 2; }
++    textures=$(mktemp -d)
++    "$bc7enc" -q -g "$logo" "$textures/pic2.dds" >/dev/null
++    # As prepare-assets.sh does for pic0/pic1: one mip level, straight alpha.
++    python3 -c 'import struct,sys; p=sys.argv[1]; d=bytearray(open(p,"rb").read()); assert d[84:88]==b"DX10" and struct.unpack_from("<I",d,128)[0]==98 and len(d)==148+3840*2160, "pic2.dds is not single-level 3840x2160 BC7"; struct.pack_into("<I",d,28,1); struct.pack_into("<I",d,144,1); open(p,"wb").write(d)' "$textures/pic2.dds"
++    cp "$textures/pic2.dds" "$app/sce_sys/"
++    rm -rf -- "$textures"
++fi
+ if [[ -n $music ]]; then
+     python3 -c 'import sys; d=open(sys.argv[1],"rb").read(24); assert d[:4]==b"RIFF" and d[8:12]==b"WAVE" and d[20:22]==b"\xfe\xff", "music must be an ATRAC9 RIFF/WAVE (snd0.at9)"' "$music"
+     cp "$music" "$app/sce_sys/snd0.at9"
+-- 
+2.56.0
+

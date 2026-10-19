@@ -1,0 +1,45 @@
+From 10dcefc910de3c7ef3debd6bc2951300888f01d7 Mon Sep 17 00:00:00 2001
+From: Robert <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 14:15:12 -0500
+Subject: [PATCH] wine64: a game started from its tile can ask for the app's
+ own eboot.bin
+
+A title whose eboot.bin is its own front end (the game runner is another
+file in app0) gets it back when the game writes <root>/return-<title>
+before it quits; the request is one shot. Without it, the title closes
+to Home as before.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 112feb4..0f59a47 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -656,6 +656,21 @@ static void restart_title(const PwWineApp *app, uint32_t cycle, const char *reas
+     char *next[PW_WINE_LAUNCH_ARGS];
+ 
+     if (!app && launch.home) {
++        /* A title whose eboot.bin is its own front end (the runner is another
++         * file in app0) gets it back when the game asks: the game writes
++         * <root>/return-<title> (one shot) before it quits. */
++        char request[160];
++
++        snprintf(request, sizeof(request), "%s/return-" PW_TITLE_ID, library_root);
++        if (unlink(request) == 0) {
++            for (size_t i = 0; i < sizeof(eboots) / sizeof(eboots[0]); i++) {
++                PS5LOG_LOG("PW_WINE64 close to=app reason=%s eboot=%s (the game asked)", reason, eboots[i]);
++                pw_diagnostics_close(reason);
++                int rc = sceSystemServiceLoadExec(eboots[i], NULL);
++                pw_diagnostics_resume();
++                PS5LOG_LOG("PW_WINE64 close to=app failed rc=0x%08x", (unsigned)rc);
++            }
++        }
+         PS5LOG_LOG("PW_WINE64 close to=home reason=%s (started from the game's tile)", reason);
+         pw_diagnostics_close(reason);
+         /* Close the way a title does: a process that ends itself with
+-- 
+2.56.0
+

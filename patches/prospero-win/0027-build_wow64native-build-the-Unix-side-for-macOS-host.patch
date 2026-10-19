@@ -1,0 +1,41 @@
+From 37e5872e58f3bc28d18217d3cac5f5b09c7c640a Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 15:30:15 -0500
+Subject: [PATCH] build_wow64native: build the Unix side for macOS host Wine
+ too
+
+The host-side wow64native.so was gcc -m64 with GNU linker flags. On
+macOS host Wine is an Intel build run through Rosetta, so the Unix side
+is Apple clang -arch x86_64 with Mach-O flags there. Linux is
+unchanged.
+---
+ tools/build_wow64native.sh | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/tools/build_wow64native.sh b/tools/build_wow64native.sh
+index 0b42998..210b53d 100755
+--- a/tools/build_wow64native.sh
++++ b/tools/build_wow64native.sh
+@@ -25,8 +25,17 @@ grep -q -- '--enable-archs=i386,x86_64' "$build_dir/config.log" || fail "not a W
+ module=$root/wine/wow64native
+ mkdir -p "$output_dir/x86_64-windows" "$output_dir/x86_64-unix"
+ out=$(CDPATH= cd -- "$output_dir" && pwd)
+-gcc -m64 -O2 -g -fPIC -shared -Wl,-Bsymbolic -Wl,-soname,wow64native.so \
+-    -Wl,-z,defs -D__WINESRC__ -DWINE_UNIX_LIB -D_REENTRANT \
++# The Unix side matches host Wine: x86-64 Linux, or an Intel macOS build run through
++# Rosetta (Apple clang, Mach-O linker flags).
++case $(uname -s) in
++Darwin) unix_cc="/usr/bin/clang -arch x86_64"
++        unix_link="-Wl,-undefined,dynamic_lookup -Wl,-install_name,wow64native.so" ;;
++*) unix_cc="gcc -m64"
++   unix_link="-Wl,-Bsymbolic -Wl,-soname,wow64native.so -Wl,-z,defs" ;;
++esac
++# shellcheck disable=SC2086
++$unix_cc -O2 -g -fPIC -shared $unix_link \
++    -D__WINESRC__ -DWINE_UNIX_LIB -D_REENTRANT \
+     -I"$module" -I"$build_dir/include" -I"$source_dir/include" \
+     "$module/unix.c" "$build_dir/dlls/ntdll/ntdll.so" -o "$out/x86_64-unix/wow64native.so"
+ x86_64-w64-mingw32-gcc -c -o "$out/x86_64-windows/cpu.o" "$module/cpu.c" \
+-- 
+2.56.0
+

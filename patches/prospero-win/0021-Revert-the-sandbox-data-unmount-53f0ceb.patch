@@ -1,0 +1,74 @@
+From 4910ae0d432d29772f3cc568a1d02b11ff7bbeb9 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 14:38:53 -0500
+Subject: [PATCH 21/24] Revert the sandbox data unmount (53f0ceb)
+
+The mount belongs to the PS5SX2 Helper; the fix belongs there (issue to
+its developer). find_sandbox_app0 still copes with the sandboxes it leaves.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c | 33 ---------------------------------
+ 1 file changed, 33 deletions(-)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index c2eada3..8e68994 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -44,7 +44,6 @@
+ #include "pw_wine_display.h"
+ #include "../include/prospero_win.h"
+ 
+-#include <errno.h>
+ #include <pthread.h>
+ #include <signal.h>
+ #include <stdio.h>
+@@ -635,37 +634,6 @@ static void find_sandbox_app0(void)
+     }
+ }
+ 
+-int sceKernelDlsym(int32_t handle, const char *symbol, void **address);
+-
+-/* PS5SXHelper's mountroot mounts /user/data on <sandbox>/data of every app as
+- * it starts. The system does not know that mount, so tearing the sandbox down
+- * fails: a PS-button close or LoadExec("exit") then waits forever ("Closing...",
+- * BlockingKill never returns), and a self-exit leaves the sandbox behind until
+- * the console restarts (klog, 2026-10-11). An elevated title reaches /data
+- * through the real root and does not need it: unmount it. */
+-static void drop_sandbox_data_mount(void)
+-{
+-    char sandbox[sizeof(sandbox_app0)], data[sizeof(sandbox_app0) + 8];
+-    struct stat outer, inner;
+-    int (*unmount_fn)(const char *, int) = NULL;
+-    char *slash;
+-
+-    snprintf(sandbox, sizeof(sandbox), "%s", sandbox_app0);
+-    if (!(slash = strrchr(sandbox, '/'))) return;
+-    *slash = 0;                                         /* <sandbox>/app0 -> <sandbox> */
+-    snprintf(data, sizeof(data), "%s/data", sandbox);
+-    if (stat(sandbox, &outer) || stat(data, &inner)) return;
+-    if (inner.st_dev == outer.st_dev) return;           /* not a mount */
+-    if (sceKernelDlsym(0x2001, "unmount", (void **)&unmount_fn) != 0 || !unmount_fn) {
+-        PS5LOG_LOG("PW_WINE64 sandbox data mount kept: no unmount in libkernel");
+-        return;
+-    }
+-    int rc = unmount_fn(data, 0);
+-    int force = rc != 0 ? unmount_fn(data, 0x80000 /* MNT_FORCE */) : 0;
+-    PS5LOG_LOG("PW_WINE64 sandbox data mount %s: %s rc=%d force_rc=%d errno=%d",
+-               rc == 0 || force == 0 ? "removed" : "kept", data, rc, force, errno);
+-}
+-
+ /* ---- one game per process -------------------------------------------- */
+ 
+ static PwWineLaunch launch;
+@@ -1045,7 +1013,6 @@ int main(int argc, char **argv)
+         return 1;
+     }
+     find_sandbox_app0();
+-    drop_sandbox_data_mount();
+     (void)pw_wine_launch_parse(argc, argv, catalog, catalog_count, &launch);
+     static const char autostart_profile[] = PW_AUTOSTART_PROFILE;
+     if (launch.mode != PW_WINE_LAUNCH_GAME && !launch.refused && autostart_profile[0] != '\0') {
+-- 
+2.56.0
+

@@ -1,0 +1,145 @@
+From 933bff34e543f6a00bc6874bebc0f82bea77ad71 Mon Sep 17 00:00:00 2001
+From: Robert <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 22:38:21 -0500
+Subject: [PATCH] input: mouse = touchpad, the DualSense touchpad moves the
+ pointer
+
+A finger's movement on the touchpad moves Windows' pointer, as a laptop's
+touchpad: twice the distance (the pad's 1920 points across a 3840-wide
+game), times mouse_speed/1200; a new touch moves nothing. The pad keeps
+the newest connected sample's first finger. Its press is a button as
+before (touchpad = mouse_left clicks).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/pw_pad_ps5.c          |  6 ++++++
+ native/pw_pad_ps5.h          |  3 +++
+ native/wine64_main.c         | 19 ++++++++++++++++++-
+ src/pw_game_profile.c        |  1 +
+ src/pw_game_profile.h        |  6 ++++--
+ tests/test_pw_game_profile.c |  5 +++++
+ 6 files changed, 37 insertions(+), 3 deletions(-)
+
+diff --git a/native/pw_pad_ps5.c b/native/pw_pad_ps5.c
+index db5ca3e..74fa4c2 100644
+--- a/native/pw_pad_ps5.c
++++ b/native/pw_pad_ps5.c
+@@ -52,6 +52,7 @@ static int valid_ops(const PwPadPs5Ops *ops)
+ static void centre_analog(PwPadPs5 *pad)
+ {
+     pad->left_stick=pad->right_stick=(PwPadPs5Stick){0x80,0x80};pad->l2=pad->r2=0;
++    pad->touching=0;
+ }
+ 
+ int pw_pad_ps5_open(PwPadPs5 *pad,const PwPadPs5Ops *ops,
+@@ -100,6 +101,11 @@ static int read_batch(PwPadPs5 *pad,PwPadSample samples[PW_PAD_PS5_BATCH])
+             pad->connected_samples++;
+             pad->left_stick=raw[i].left_stick;pad->right_stick=raw[i].right_stick;
+             pad->l2=raw[i].l2;pad->r2=raw[i].r2;
++            pad->touching=raw[i].touch_data.fingers>0;
++            if(pad->touching){
++                pad->touch_finger=raw[i].touch_data.touch[0].finger;
++                pad->touch_x=raw[i].touch_data.touch[0].x;pad->touch_y=raw[i].touch_data.touch[0].y;
++            }
+         }
+         else{pad->disconnected_samples++;centre_analog(pad);}
+     }
+diff --git a/native/pw_pad_ps5.h b/native/pw_pad_ps5.h
+index f6f95e8..302d057 100644
+--- a/native/pw_pad_ps5.h
++++ b/native/pw_pad_ps5.h
+@@ -40,6 +40,9 @@ typedef struct PwPadPs5 {
+     /* The newest connected sample's sticks (0..255, 0x80 centred) and
+      * triggers; centred and released while disconnected or intercepted. */
+     PwPadPs5Stick left_stick,right_stick;uint8_t l2,r2;
++    /* The newest connected sample's first finger on the touchpad: touching, its id
++     * (new for each touch) and position (0..1919, 0..1079). */
++    uint8_t touching,touch_finger;uint16_t touch_x,touch_y;
+ } PwPadPs5;
+ 
+ int pw_pad_ps5_platform_ops(PwPadPs5Ops *);
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 0f59a47..ef728d8 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -1411,7 +1411,24 @@ int main(int argc, char **argv)
+             size_t count = pw_wine_game_inputs(&game_input, pad.core.pressed_edges,
+                                                pad.core.released_edges, events,
+                                                sizeof(events) / sizeof(events[0]) - 1);
+-            if (game_input.mouse != PW_GAME_STICK_NONE) {
++            if (game_input.mouse == PW_GAME_STICK_TOUCHPAD) {
++                /* A finger's movement, as a laptop's touchpad: the pointer moves by
++                 * mouse_speed/1200 times twice the distance (the pad's 1920 points
++                 * across a 3840-wide game); a new touch moves nothing. */
++                static int touched;
++                static uint8_t finger;
++                static uint16_t last_x, last_y;
++                if (pad.touching && touched && pad.touch_finger == finger) {
++                    int32_t dx = ((int32_t)pad.touch_x - last_x) * 2 * (int32_t)game_input.mouse_speed / 1200;
++                    int32_t dy = ((int32_t)pad.touch_y - last_y) * 2 * (int32_t)game_input.mouse_speed / 1200;
++                    if (dx || dy)
++                        events[count++] = (PwWineInput){ PW_WINE_INPUT_MOUSE_MOVE, 0, dx, dy, 0 };
++                }
++                touched = pad.touching;
++                finger = pad.touch_finger;
++                last_x = pad.touch_x;
++                last_y = pad.touch_y;
++            } else if (game_input.mouse != PW_GAME_STICK_NONE) {
+                 const PwPadPs5Stick *stick = game_input.mouse == PW_GAME_STICK_LEFT ?
+                                              &pad.left_stick : &pad.right_stick;
+                 count += (size_t)pw_wine_pointer_step(&pointer, stick->x, stick->y,
+diff --git a/src/pw_game_profile.c b/src/pw_game_profile.c
+index 3fb6a3a..dfa4a81 100644
+--- a/src/pw_game_profile.c
++++ b/src/pw_game_profile.c
+@@ -126,6 +126,7 @@ static int input_field(PwGameInput *input, const uint8_t *key, size_t key_length
+         if (is(v, n, "none")) input->mouse = PW_GAME_STICK_NONE;
+         else if (is(v, n, "left_stick")) input->mouse = PW_GAME_STICK_LEFT;
+         else if (is(v, n, "right_stick")) input->mouse = PW_GAME_STICK_RIGHT;
++        else if (is(v, n, "touchpad")) input->mouse = PW_GAME_STICK_TOUCHPAD;
+         else return PW_ERR_UNSUPPORTED;
+         input->set |= SET_MOUSE;
+         return PW_OK;
+diff --git a/src/pw_game_profile.h b/src/pw_game_profile.h
+index a140d82..e4120a6 100644
+--- a/src/pw_game_profile.h
++++ b/src/pw_game_profile.h
+@@ -19,7 +19,8 @@
+  *   mode = keyboard        ; keyboard (buttons send keys/mouse) or xinput (also
+  *                          ; the game's XInput controller); default: xinput
+  *                          ; when nothing is bound, keyboard otherwise
+- *   mouse = right_stick    ; a stick moves the pointer: left_stick, right_stick, none
++ *   mouse = right_stick    ; what moves the pointer: left_stick, right_stick,
++ *                          ; touchpad (a finger's movement on it), none
+  *   mouse_speed = 1200     ; pointer pixels per second at full tilt
+  *   cross = space          ; <button> = <key> | mouse_left | mouse_right |
+  *   r2 = mouse_left        ;            mouse_middle | vk:0xNN | none
+@@ -76,7 +77,8 @@ typedef enum PwGameScaling { PW_GAME_SCALING_FIT = 0, PW_GAME_SCALING_INTEGER,
+                              PW_GAME_SCALING_STRETCH } PwGameScaling;
+ typedef enum PwGameView { PW_GAME_VIEW_WINDOW = 0, PW_GAME_VIEW_DESKTOP } PwGameView;
+ typedef enum PwGameInputMode { PW_GAME_INPUT_KEYBOARD = 0, PW_GAME_INPUT_XINPUT } PwGameInputMode;
+-typedef enum PwGameStick { PW_GAME_STICK_NONE = 0, PW_GAME_STICK_LEFT, PW_GAME_STICK_RIGHT } PwGameStick;
++typedef enum PwGameStick { PW_GAME_STICK_NONE = 0, PW_GAME_STICK_LEFT, PW_GAME_STICK_RIGHT,
++                           PW_GAME_STICK_TOUCHPAD } PwGameStick;
+ typedef enum PwGameBindKind { PW_GAME_BIND_UNSET = 0, PW_GAME_BIND_NONE, PW_GAME_BIND_KEY,
+                               PW_GAME_BIND_MOUSE } PwGameBindKind;
+ 
+diff --git a/tests/test_pw_game_profile.c b/tests/test_pw_game_profile.c
+index 9005b9e..4546928 100644
+--- a/tests/test_pw_game_profile.c
++++ b/tests/test_pw_game_profile.c
+@@ -325,6 +325,11 @@ static void test_presets(void)
+     pw_game_input_overlay(&input, &overrides);
+     assert(input.mouse_speed == 400);
+ 
++    /* The touchpad moves the pointer; its press is a button like any other. */
++    assert(parse(APP "[input]\nmode = xinput\nmouse = touchpad\ntouchpad = mouse_left\n", &p) == PW_OK);
++    assert(p.input.mouse == PW_GAME_STICK_TOUCHPAD && p.input.mode == PW_GAME_INPUT_XINPUT);
++    assert(parse(APP "[input]\nmouse = trackpad\n", &p) == PW_ERR_UNSUPPORTED);
++
+     /* A preset holds only [input] and cannot chain another preset. */
+     assert(preset("[input]\npreset = other\n", &input) == PW_ERR_MALFORMED);
+     assert(preset("[display]\ndesktop = 800x600\n", &input) == PW_ERR_MALFORMED);
+-- 
+2.56.0
+

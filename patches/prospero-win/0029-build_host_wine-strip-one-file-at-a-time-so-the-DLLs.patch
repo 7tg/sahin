@@ -1,0 +1,37 @@
+From 5731a0aaa2c81fff2d692a863604ddfb8049151e Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Wed, 14 Oct 2026 16:37:35 -0500
+Subject: [PATCH] build_host_wine: strip one file at a time, so the DLLs don't
+ depend on find's order
+
+GNU strip carries state from one PE file to the next within one run. With find's {} +,
+a DLL's stripped bytes depended on the file before it, and find's order differs between
+filesystems: the same build tree gave other acledit.dll and dinput.dll on another machine.
+---
+ tools/build_host_wine.sh | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/tools/build_host_wine.sh b/tools/build_host_wine.sh
+index 7e95611..0e20dcd 100755
+--- a/tools/build_host_wine.sh
++++ b/tools/build_host_wine.sh
+@@ -88,9 +88,13 @@ rm -rf "$install"
+ make -C "$build" install DESTDIR="$install" > "$work/install.log" 2>&1 ||
+     fail "the install failed; see $work/install.log"
+ lib=$install/usr/lib/wine
+-find "$lib/i386-windows" -type f -exec i686-w64-mingw32-strip -s {} + 2>/dev/null || true
+-find "$lib/x86_64-windows" -type f -exec x86_64-w64-mingw32-strip -s {} + 2>/dev/null || true
+-find "$lib/x86_64-unix" "$install/usr/bin" -type f -exec strip --strip-unneeded {} + 2>/dev/null || true
++# One file per strip: GNU strip carries state from one PE file to the next within a run, so
++# with many files per run a DLL's bytes depend on which file came before it, and find's
++# order differs from one filesystem to another (acledit.dll and dinput.dll came out
++# different on two machines from the same build tree).
++find "$lib/i386-windows" -type f -exec i686-w64-mingw32-strip -s {} \; 2>/dev/null || true
++find "$lib/x86_64-windows" -type f -exec x86_64-w64-mingw32-strip -s {} \; 2>/dev/null || true
++find "$lib/x86_64-unix" "$install/usr/bin" -type f -exec strip --strip-unneeded {} \; 2>/dev/null || true
+ 
+ wine=$install/usr/bin/wine
+ "$wine" --version > /dev/null || fail "the installed wine does not run"
+-- 
+2.56.0
+

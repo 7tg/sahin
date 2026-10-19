@@ -1,0 +1,33 @@
+From 44ae0b2257b4b50c12bd2f798dc0bdb6e1f74063 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 13:15:15 -0500
+Subject: [PATCH 22/24] Close a game app to Home with LoadExec("exit"), as
+ titles do
+
+Ending the process with _exit(0) after the game quit showed CE-108255-1
+("Something went wrong") every time and left the app's sandbox behind.
+The tile already closes this way (5510463).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 8e68994..27e3352 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -656,6 +656,10 @@ static void restart_title(const PwWineApp *app, uint32_t cycle, const char *reas
+     if (!app && launch.home) {
+         PS5LOG_LOG("PW_WINE64 close to=home reason=%s (started from the game's tile)", reason);
+         pw_diagnostics_close(reason);
++        /* Close the way a title does: a process that ends itself with
++         * _exit is a crash to the system (CE-108255-1 on every quit,
++         * measured), and its sandbox lingers until the console restarts. */
++        sceSystemServiceLoadExec("exit", NULL);
+         _exit(0);
+     }
+     if (!pw_wine_launch_argv(app, cycle, storage, sizeof(storage), next, PW_WINE_LAUNCH_ARGS)) {
+-- 
+2.56.0
+

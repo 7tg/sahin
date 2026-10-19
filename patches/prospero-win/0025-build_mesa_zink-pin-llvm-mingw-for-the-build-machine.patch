@@ -1,0 +1,35 @@
+From 63f7f876bc273a03d722efd12e1650b1eb2821d4 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 15:11:37 -0500
+Subject: [PATCH] build_mesa_zink: pin llvm-mingw for the build machine (macOS
+ universal or Ubuntu x86-64)
+
+The Zink step only accepted the Ubuntu x86-64 llvm-mingw archive, which
+can't run on macOS. The same release's macOS universal build is pinned
+for Darwin (sha256 as GitHub lists it; the Ubuntu one matches GitHub's
+too). Linux is unchanged.
+---
+ tools/build_mesa_zink.sh | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/tools/build_mesa_zink.sh b/tools/build_mesa_zink.sh
+index fd031f0..581ed1c 100755
+--- a/tools/build_mesa_zink.sh
++++ b/tools/build_mesa_zink.sh
+@@ -5,7 +5,12 @@ set -euo pipefail
+ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ MESA_COMMIT=e4607ef697fe3df8d1ebc329bf1917d041843306
+ LLVM_MINGW_VERSION=20260922-ucrt
+-LLVM_MINGW_SHA256=bb7bb7654b33d5aa8712acb837c963b2e0c56352560c76105270a3268c665c21
++# The same llvm-mingw release, built for the machine doing the build:
++#   llvm-mingw-20260922-ucrt-ubuntu-22.04-x86_64.tar.xz on Linux, -macos-universal.tar.xz on macOS.
++case $(uname -s) in
++Darwin) LLVM_MINGW_SHA256=52e5f5a7b131021d0c39a37a38fa380a1da7885cd04bd61afd0cd4ecfb8bc1f3 ;;
++*) LLVM_MINGW_SHA256=bb7bb7654b33d5aa8712acb837c963b2e0c56352560c76105270a3268c665c21 ;;
++esac
+ work= mesa= archive= jobs=1
+ fail() { echo "build_mesa_zink: $*" >&2; exit 2; }
+ while [ $# -gt 0 ]; do
+-- 
+2.56.0
+

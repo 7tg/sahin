@@ -1,0 +1,46 @@
+# Read by Wine's configure in the build image (CONFIG_SITE, tools/build-prospero-win.sh hostwine).
+# Host Wine only builds tools and DLLs and creates prefixes: every optional library is off,
+# so the build doesn't depend on what else is installed.
+with_alsa=no
+with_capi=no
+with_coreaudio=no
+with_cups=no
+with_dbus=no
+with_ffmpeg=no
+with_fontconfig=no
+with_freetype=no
+with_gettext=no
+with_gettextpo=no
+with_gphoto=no
+with_gnutls=no
+with_gssapi=no
+with_gstreamer=no
+with_inotify=no
+with_krb5=no
+with_netapi=no
+with_opencl=no
+with_opengl=no
+with_oss=no
+with_pcap=no
+with_pcsclite=no
+with_pulse=no
+with_sane=no
+with_sdl=no
+with_udev=no
+with_unwind=no
+with_usb=no
+with_v4l2=no
+with_vulkan=no
+with_wayland=no
+with_x=no
+with_xcomposite=no
+with_xcursor=no
+with_xfixes=no
+with_xinerama=no
+with_xinput=no
+with_xinput2=no
+with_xrandr=no
+with_xrender=no
+with_xshape=no
+with_xshm=no
+with_xxf86vm=no

@@ -1,0 +1,33 @@
+From 76a2fd2743dec64906137093c004f51cdba8e2d4 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 13:24:41 -0500
+Subject: [PATCH 19/24] Revert LoadExec("exit") for a game app's close to Home
+
+On the console it left a black screen after the game quit (log ends at
+session_end): the system could not end the app, as when it is closed
+from the PS button ("Closing..." forever). _exit(0) shows CE-108255-1 but
+returns to Home, and find_sandbox_app0 copes with the sandbox it leaves.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/wine64_main.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 27e3352..8e68994 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -656,10 +656,6 @@ static void restart_title(const PwWineApp *app, uint32_t cycle, const char *reas
+     if (!app && launch.home) {
+         PS5LOG_LOG("PW_WINE64 close to=home reason=%s (started from the game's tile)", reason);
+         pw_diagnostics_close(reason);
+-        /* Close the way a title does: a process that ends itself with
+-         * _exit is a crash to the system (CE-108255-1 on every quit,
+-         * measured), and its sandbox lingers until the console restarts. */
+-        sceSystemServiceLoadExec("exit", NULL);
+         _exit(0);
+     }
+     if (!pw_wine_launch_argv(app, cycle, storage, sizeof(storage), next, PW_WINE_LAUNCH_ARGS)) {
+-- 
+2.56.0
+

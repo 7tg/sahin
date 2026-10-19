@@ -1,0 +1,16 @@
+[submodule "prospero-win"]
+	path = prospero-win
+	url = https://github.com/mpereiraesaa/prospero-win.git
+[submodule "PS5_Vulkan"]
+	path = PS5_Vulkan
+	url = https://github.com/mpereiraesaa/PS5_Vulkan.git
+[submodule "PS5_PayloadSDK"]
+	path = PS5_PayloadSDK
+	url = https://github.com/mihawk-99/PS5_PayloadSDK.git
+[submodule "ps5-native-app-boilerplate"]
+	path = ps5-native-app-boilerplate
+	url = https://github.com/mpereiraesaa/ps5-native-app-boilerplate.git
+	branch = exp/prx-module
+[submodule "PS5_Mesa"]
+	path = PS5_Mesa
+	url = https://github.com/mpereiraesaa/PS5_Mesa.git

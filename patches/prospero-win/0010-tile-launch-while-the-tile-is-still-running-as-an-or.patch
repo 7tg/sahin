@@ -1,0 +1,116 @@
+From aab58710943a1d920c049fbccd5efb26779f3b9b Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 19:30:14 -0500
+Subject: [PATCH 10/24] tile: launch while the tile is still running, as an
+ ordinary app switch
+
+ShadowMount+ (claim_prepared_title) refuses another title with EBUSY once
+the previous one has exited and awaits a same-app restart, so every launch
+after the tile closed failed ("launch mount unavailable ... Device busy",
+0x80940033 for 15 s). Starting the game while the tile is the running app
+is the switch the home screen makes. The tile now stays open (closing
+itself after 30 s if nothing replaced it); the payload launches at once.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/tile/pw_tile_launch.c | 27 ++++++++++++---------------
+ native/tile/pw_tile_main.c   | 14 ++++++++++----
+ 2 files changed, 22 insertions(+), 19 deletions(-)
+
+diff --git a/native/tile/pw_tile_launch.c b/native/tile/pw_tile_launch.c
+index 7371362..20f5149 100644
+--- a/native/tile/pw_tile_launch.c
++++ b/native/tile/pw_tile_launch.c
+@@ -6,9 +6,12 @@
+  * sceLncUtilLaunchApp unresolved for it (the first tile jumped to address 0).
+  * A payload can, as PS5_Vulkan's ps5vkctl does. So the tile writes what to
+  * start to TILE_REQUEST, sends this program to the console's payload loader
+- * (loopback port 9021, as prospero-win sends lapy.elf) and closes; this
+- * program waits for the tile to be gone, starts the target title with
+- * "profile=<id>" and "home=1", and exits.
++ * (loopback port 9021, as prospero-win sends lapy.elf) and waits; this
++ * program starts the target title with "profile=<id>" and "home=1" while
++ * the tile is still in front, so the console switches from the tile to it
++ * (ShadowMount+ refuses a launch once the previous title has exited and
++ * awaits a same-app restart: "launch mount unavailable ... Device busy"),
++ * and exits.
+  *
+  * Built with the PS5 payload SDK by tools/build_tile.sh. What each launch
+  * call answered is appended to /data/prospero-win/logs/tile-<profile>.log.
+@@ -99,13 +102,9 @@ int main(void)
+     snprintf(word, sizeof(word), "profile=%s", profile);
+     const char *argv[] = { word, "home=1", NULL };
+ 
+-    /* Let the tile finish closing: one application in front at a time. */
+-    for (int wait = 0; wait < 40; wait++) {
+-        running_title(running, sizeof(running));
+-        if (!tile[0] || strcmp(running, tile)) break;
+-        usleep(100000);
+-    }
+-    log_line("payload: in front now: '%s'; starting %s with %s home=1", running, target, word);
++    running_title(running, sizeof(running));
++    log_line("payload: in front now: '%s' (tile %s); starting %s with %s home=1", running, tile,
++             target, word);
+ 
+     sceUserServiceInitialize(NULL);
+     int foreground = -1;
+@@ -120,12 +119,10 @@ int main(void)
+         { "lncUtil/login", sceLncUtilLaunchApp, login },
+         { "systemService/login", sceSystemServiceLaunchApp, login },
+     };
+-    /* While the tile's sandbox is still being removed, ShadowMount+ cannot
+-     * mount the target ("launch mount unavailable: Device busy") and the
+-     * launch is refused (0x80940033): give it a moment, then keep asking. */
+-    usleep(1500000);
++    /* Asked at once, while the tile runs; a refusal (0x80940033) is asked
++     * again a few times in case the console was still settling. */
+     int started = 0;
+-    for (int round = 1; round <= 15 && !started; round++) {
++    for (int round = 1; round <= 5 && !started; round++) {
+         for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]) && !started; i++) {
+             if (attempts[i].user_id < 0) continue;
+             lnc_app_param_t param;
+diff --git a/native/tile/pw_tile_main.c b/native/tile/pw_tile_main.c
+index f313b98..26213b2 100644
+--- a/native/tile/pw_tile_main.c
++++ b/native/tile/pw_tile_main.c
+@@ -13,8 +13,11 @@
+  * to address 0 calling it). So the tile writes the request to TILE_REQUEST,
+  * sends its payload, tile-launch.elf (native/tile/pw_tile_launch.c), to the
+  * console's payload loader on loopback port 9021, as prospero-win sends
+- * lapy.elf, and closes; the payload waits for it to be gone and starts the
+- * game.
++ * lapy.elf, and stays open: the payload starts the game while the tile is
++ * still the running application, which the system (and ShadowMount+, which
++ * refuses another title while an exited one awaits a same-app restart)
++ * treat as an ordinary switch from one app to the next, closing the tile.
++ * If nothing has replaced the tile after TILE_WAIT_S, it closes itself.
+  *
+  * Which game: /app0/tile.conf ("profile=<id>", "target=<TITLEID>",
+  * "tile=<own TITLEID>"), written by tools/build_tile.sh, so one eboot serves
+@@ -38,6 +41,7 @@ int sceSystemServiceLoadExec(const char *path, char *const argv[]);
+ 
+ #define TILE_LOADER_PORT 9021
+ #define TILE_TIMEOUT_US 5000000
++#define TILE_WAIT_S 30
+ 
+ /* Where the tile reads, writes and sends. A table of pointers, kept as data:
+  * it gives the image the .data.rel.ro section ps5-native-tool requires. */
+@@ -152,10 +156,12 @@ int main(void)
+     fclose(request);
+     log_line("tile: %s asks for %s profile=%s home=1", tile, target, profile);
+     if (send_payload() != 0) unlink(tile_paths[TILE_REQUEST]);
++    else
++        for (int second = 0; second < TILE_WAIT_S; second++) sleep(1);   /* the switch ends us */
++    log_line("tile: nothing replaced the tile; closing");
+     if (log_file) fclose(log_file);
+     /* Close the way a title does (returning from main ends in a system call
+-     * the sandbox refuses: SIGSYS); the payload starts the game once the
+-     * tile is gone. */
++     * the sandbox refuses: SIGSYS). */
+     sceSystemServiceLoadExec("exit", NULL);
+     return 0;
+ }
+-- 
+2.56.0
+

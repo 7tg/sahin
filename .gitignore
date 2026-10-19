@@ -1,0 +1,18 @@
+/src/
+/logs/
+
+
+
+
+# Build inputs and outputs fetched or made by tools/ (compiler-rt builtins, ...).
+/.deps/
+/downloads/
+
+# prospero-win packages and Home apps built by tools/build-prospero-win.sh (Linux or macOS).
+/release/
+
+
+.DS_Store
+
+# Python caches.
+__pycache__/

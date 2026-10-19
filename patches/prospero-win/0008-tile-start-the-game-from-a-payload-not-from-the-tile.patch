@@ -1,0 +1,424 @@
+From 872934a231bb4476a06552bcecb654fa99f6d95a Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 19:05:36 -0500
+Subject: [PATCH 08/24] tile: start the game from a payload, not from the tile
+
+The first tile crashed at address 0 calling sceLncUtilLaunchApp: the
+loader leaves it unresolved for a sandboxed title. A payload can call it
+(PS5_Vulkan ps5vkctl does), so the tile now writes the request to
+/data/prospero-win/tile-request, sends tile-launch.elf
+(native/tile/pw_tile_launch.c) to the payload loader on loopback port
+9021, as prospero-win sends lapy.elf, and closes. The payload waits until
+the tile is no longer in front, starts the target with "profile=<id>
+home=1" and logs each launch call to tile-<id>.log.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ native/tile/pw_tile_launch.c | 135 ++++++++++++++++++++++++++
+ native/tile/pw_tile_main.c   | 177 ++++++++++++++++++++---------------
+ tools/build_tile.sh          |  10 +-
+ 3 files changed, 243 insertions(+), 79 deletions(-)
+ create mode 100644 native/tile/pw_tile_launch.c
+
+diff --git a/native/tile/pw_tile_launch.c b/native/tile/pw_tile_launch.c
+new file mode 100644
+index 0000000..27cfcf7
+--- /dev/null
++++ b/native/tile/pw_tile_launch.c
+@@ -0,0 +1,135 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/*
++ * The payload half of a Home-screen tile (native/tile/pw_tile_main.c).
++ *
++ * An app in its sandbox cannot start another title: the loader leaves
++ * sceLncUtilLaunchApp unresolved for it (the first tile jumped to address 0).
++ * A payload can, as PS5_Vulkan's ps5vkctl does. So the tile writes what to
++ * start to TILE_REQUEST, sends this program to the console's payload loader
++ * (loopback port 9021, as prospero-win sends lapy.elf) and closes; this
++ * program waits for the tile to be gone, starts the target title with
++ * "profile=<id>" and "home=1", and exits.
++ *
++ * Built with the PS5 payload SDK by tools/build_tile.sh. What each launch
++ * call answered is appended to /data/prospero-win/logs/tile-<profile>.log.
++ */
++#include <stdarg.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++#define TILE_REQUEST "/data/prospero-win/tile-request"
++#define TILE_LOG_DIR "/data/prospero-win/logs"
++
++/* The launch parameter etaHEN's launcher passes, field for field. */
++typedef struct lnc_app_param {
++    uint32_t size;
++    int user_id;
++    uint32_t app_opt;
++    uint64_t crash_report;
++    uint64_t check_flag;
++} lnc_app_param_t;
++
++typedef struct login_user_id_list {
++    int user_id[4];
++} login_user_id_list_t;
++
++extern int sceLncUtilLaunchApp(const char *title_id, const char *argv[], lnc_app_param_t *param);
++extern int sceSystemServiceLaunchApp(const char *title_id, const char *argv[], lnc_app_param_t *param);
++extern uint32_t sceLncUtilGetAppIdOfRunningBigApp(void);
++extern int sceLncUtilGetAppTitleId(uint32_t app_id, char *title_id);
++extern int sceUserServiceInitialize(void *param);
++extern int sceUserServiceGetForegroundUser(int *user_id);
++extern int sceUserServiceGetLoginUserIdList(login_user_id_list_t *list);
++
++static FILE *log_file;
++
++static void log_line(const char *format, ...) __attribute__((format(printf, 1, 2)));
++static void log_line(const char *format, ...)
++{
++    va_list arguments;
++    va_start(arguments, format);
++    if (log_file) {
++        vfprintf(log_file, format, arguments);
++        fputc('\n', log_file);
++        fflush(log_file);
++    }
++    va_end(arguments);
++}
++
++static int login_user(void)
++{
++    login_user_id_list_t users;
++    memset(&users, 0, sizeof(users));
++    if (sceUserServiceGetLoginUserIdList(&users) != 0) return -1;
++    for (int i = 0; i < 4; i++)
++        if (users.user_id[i] >= 0) return users.user_id[i];
++    return -1;
++}
++
++/* The title id of the application in the foreground, or "" when none. */
++static void running_title(char *out, size_t size)
++{
++    char title[32] = {0};
++    uint32_t app_id = sceLncUtilGetAppIdOfRunningBigApp();
++    out[0] = 0;
++    if (app_id != 0xffffffffu && app_id != 0 && sceLncUtilGetAppTitleId(app_id, title) == 0)
++        snprintf(out, size, "%s", title);
++}
++
++int main(void)
++{
++    char line[160], profile[96] = "", target[16] = "PPSA99995", tile[16] = "";
++    char word[112], path[192], running[32];
++
++    FILE *request = fopen(TILE_REQUEST, "r");
++    if (!request) return 1;
++    while (fgets(line, sizeof(line), request)) {
++        line[strcspn(line, "\r\n")] = 0;
++        if (!strncmp(line, "profile=", 8)) snprintf(profile, sizeof(profile), "%s", line + 8);
++        else if (!strncmp(line, "target=", 7)) snprintf(target, sizeof(target), "%s", line + 7);
++        else if (!strncmp(line, "tile=", 5)) snprintf(tile, sizeof(tile), "%s", line + 5);
++    }
++    fclose(request);
++    unlink(TILE_REQUEST);
++    if (!profile[0]) return 1;
++    snprintf(path, sizeof(path), TILE_LOG_DIR "/tile-%s.log", profile);
++    log_file = fopen(path, "a");
++    snprintf(word, sizeof(word), "profile=%s", profile);
++    const char *argv[] = { word, "home=1", NULL };
++
++    /* Let the tile finish closing: one application in front at a time. */
++    for (int wait = 0; wait < 40; wait++) {
++        running_title(running, sizeof(running));
++        if (!tile[0] || strcmp(running, tile)) break;
++        usleep(100000);
++    }
++    log_line("payload: in front now: '%s'; starting %s with %s home=1", running, target, word);
++
++    sceUserServiceInitialize(NULL);
++    int foreground = -1;
++    if (sceUserServiceGetForegroundUser(&foreground) != 0) foreground = -1;
++    const int login = login_user();
++    const struct {
++        const char *name;
++        int (*call)(const char *, const char *[], lnc_app_param_t *);
++        int user_id;
++    } attempts[] = {
++        { "lncUtil/foreground", sceLncUtilLaunchApp, foreground },
++        { "lncUtil/login", sceLncUtilLaunchApp, login },
++        { "systemService/login", sceSystemServiceLaunchApp, login },
++    };
++    for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]); i++) {
++        if (attempts[i].user_id < 0) continue;
++        lnc_app_param_t param;
++        memset(&param, 0, sizeof(param));
++        param.size = (uint32_t)sizeof(param);
++        param.user_id = attempts[i].user_id;
++        int rc = attempts[i].call(target, argv, &param);
++        log_line("payload: %s user %d -> 0x%08x", attempts[i].name, attempts[i].user_id, (unsigned)rc);
++        if (rc == 0) break;
++    }
++    if (log_file) fclose(log_file);
++    return 0;
++}
+diff --git a/native/tile/pw_tile_main.c b/native/tile/pw_tile_main.c
+index 1088825..debb0c7 100644
+--- a/native/tile/pw_tile_main.c
++++ b/native/tile/pw_tile_main.c
+@@ -3,60 +3,59 @@
+  * A game's own Home-screen tile.
+  *
+  * A tile is a tiny title of its own (its title id, name and icon) whose only
+- * job is to start prospero-win (PPSA99995) straight into one game:
+- * sceLncUtilLaunchApp with "profile=<id>" and "home=1", so the game closes to
+- * Home rather than to the launcher (src/pw_wine_launch.h). prospero-win
+- * still requests the /data mount, loads the library and runs Wine itself;
+- * the tile needs no elevation.
++ * job is to start prospero-win (PPSA99995) straight into one game, with
++ * "profile=<id>" and "home=1" so the game closes to Home rather than to the
++ * launcher (src/pw_wine_launch.h). prospero-win still requests the /data
++ * mount, loads the library and runs Wine itself.
+  *
+- * Which game: /app0/tile.conf, "profile=<id>" (and optionally
+- * "target=<TITLEID>", default PPSA99995), written by tools/build_tile.sh,
+- * so one eboot serves every tile. What each launch call answered goes to
+- * /data/prospero-win/logs/tile-<profile>.log when the title can write there.
++ * An app cannot start another title itself: the loader leaves
++ * sceLncUtilLaunchApp unresolved in a sandboxed title (the first tile jumped
++ * to address 0 calling it). So the tile writes the request to TILE_REQUEST,
++ * sends its payload, tile-launch.elf (native/tile/pw_tile_launch.c), to the
++ * console's payload loader on loopback port 9021, as prospero-win sends
++ * lapy.elf, and closes; the payload waits for it to be gone and starts the
++ * game.
++ *
++ * Which game: /app0/tile.conf ("profile=<id>", "target=<TITLEID>",
++ * "tile=<own TITLEID>"), written by tools/build_tile.sh, so one eboot serves
++ * every tile. Progress is appended to /data/prospero-win/logs/tile-<id>.log.
+  */
+ #include <stdarg.h>
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <string.h>
++#include <fcntl.h>
++#include <sys/socket.h>
+ #include <unistd.h>
+ 
+-/* The launch parameter etaHEN's launcher passes, field for field
+- * (as PS5_Vulkan's ps5vkctl uses it on a console). */
+-typedef struct lnc_app_param {
+-    uint32_t size;
+-    int user_id;
+-    uint32_t app_opt;
+-    uint64_t crash_report;
+-    uint64_t check_flag;
+-} lnc_app_param_t;
+-
+-typedef struct login_user_id_list {
+-    int user_id[4];
+-} login_user_id_list_t;
++int sceNetConnect(int, const struct sockaddr *, socklen_t);
++int sceNetSend(int, const void *, size_t, int);
++int sceNetSetsockopt(int, int, int, const void *, socklen_t);
++int sceNetShutdown(int, int);
++int sceNetSocket(const char *, int, int, int);
++int sceNetSocketClose(int);
+ 
+-extern int sceLncUtilLaunchApp(const char *title_id, const char *argv[], lnc_app_param_t *param);
+-extern int sceSystemServiceLaunchApp(const char *title_id, const char *argv[], lnc_app_param_t *param);
+-extern int sceUserServiceInitialize(void *param);
+-extern int sceUserServiceGetForegroundUser(int *user_id);
+-extern int sceUserServiceGetLoginUserIdList(login_user_id_list_t *list);
++#define TILE_LOADER_PORT 9021
++#define TILE_TIMEOUT_US 5000000
+ 
+-#define TILE_CONF "/app0/tile.conf"
++/* Where the tile reads, writes and sends. A table of pointers, kept as data:
++ * it gives the image the .data.rel.ro section ps5-native-tool requires. */
++enum { TILE_CONF, TILE_PAYLOAD, TILE_REQUEST, TILE_LOG_DIR };
++static const char *const tile_paths[] __attribute__((used)) = {
++    [TILE_CONF] = "/app0/tile.conf",
++    [TILE_PAYLOAD] = "/app0/tile-launch.elf",
++    [TILE_REQUEST] = "/data/prospero-win/tile-request",
++    [TILE_LOG_DIR] = "/data/prospero-win/logs",
++};
+ 
+-/* The ways of asking the console to start a title, in the order etaHEN and
+- * AirPSX use them (as ps5vkctl tries them). A table of pointers, kept even
+- * when the loop is unrolled: it gives the image the .data.rel.ro section
+- * ps5-native-tool requires. */
+-enum tile_user { TILE_FOREGROUND, TILE_LOGIN };
+-static const struct tile_attempt {
+-    const char *name;
+-    int (*call)(const char *, const char *[], lnc_app_param_t *);
+-    enum tile_user user;
+-} attempts[] __attribute__((used)) = {
+-    { "lncUtil/foreground", sceLncUtilLaunchApp, TILE_FOREGROUND },
+-    { "lncUtil/login", sceLncUtilLaunchApp, TILE_LOGIN },
+-    { "systemService/login", sceSystemServiceLaunchApp, TILE_LOGIN },
++struct tile_sockaddr_in {
++    uint8_t length;
++    uint8_t family;
++    uint16_t port;
++    uint32_t address;
++    uint16_t virtual_port;
++    uint8_t zero[6];
+ };
+-#define TILE_LOG_DIR "/data/prospero-win/logs"
+ 
+ static FILE *log_file;
+ 
+@@ -73,62 +72,86 @@ static void log_line(const char *format, ...)
+     va_end(arguments);
+ }
+ 
+-/* "key=value" lines; returns 0 when profile= was found. */
+-static int read_conf(char *profile, size_t profile_size, char *target, size_t target_size)
++/* tile.conf's "key=value" lines; returns 0 when profile= was found. */
++static int read_conf(char *profile, size_t profile_size, char *target, size_t target_size,
++                     char *tile, size_t tile_size)
+ {
+     char line[160];
+-    FILE *conf = fopen(TILE_CONF, "r");
++    FILE *conf = fopen(tile_paths[TILE_CONF], "r");
+     if (!conf) return -1;
+     profile[0] = 0;
+     while (fgets(line, sizeof(line), conf)) {
+         line[strcspn(line, "\r\n")] = 0;
+         if (!strncmp(line, "profile=", 8)) snprintf(profile, profile_size, "%s", line + 8);
+         else if (!strncmp(line, "target=", 7)) snprintf(target, target_size, "%s", line + 7);
++        else if (!strncmp(line, "tile=", 5)) snprintf(tile, tile_size, "%s", line + 5);
+     }
+     fclose(conf);
+     return profile[0] ? 0 : -1;
+ }
+ 
+-static int login_user(void)
++/* Stream the payload to the loader; 0 when all of it was sent. */
++static int send_payload(void)
+ {
+-    login_user_id_list_t users;
+-    memset(&users, 0, sizeof(users));
+-    if (sceUserServiceGetLoginUserIdList(&users) != 0) return -1;
+-    for (int i = 0; i < 4; i++)
+-        if (users.user_id[i] >= 0) return users.user_id[i];
+-    return -1;
++    uint8_t buffer[4096];
++    uint32_t timeout = TILE_TIMEOUT_US;
++    struct tile_sockaddr_in address;
++    long total = 0;
++    int result = -1;
++
++    int payload = open(tile_paths[TILE_PAYLOAD], O_RDONLY);
++    if (payload < 0) { log_line("tile: no %s", tile_paths[TILE_PAYLOAD]); return -1; }
++    int socket = sceNetSocket("pw_tile", AF_INET, SOCK_STREAM, 6 /* TCP */);
++    if (socket < 0) { log_line("tile: socket -> 0x%08x", (unsigned)socket); close(payload); return -1; }
++    for (int option = 0x1105; option <= 0x1106; option++)   /* send and receive timeouts */
++        (void)sceNetSetsockopt(socket, 0xffff, option, &timeout, sizeof(timeout));
++    memset(&address, 0, sizeof(address));
++    address.length = sizeof(address);
++    address.family = AF_INET;
++    address.port = (uint16_t)((TILE_LOADER_PORT << 8) | (TILE_LOADER_PORT >> 8));
++    address.address = UINT32_C(0x0100007f);
++    int rc = sceNetConnect(socket, (const struct sockaddr *)&address, sizeof(address));
++    if (rc < 0) {
++        log_line("tile: no payload loader on port %d (0x%08x)", TILE_LOADER_PORT, (unsigned)rc);
++        goto done;
++    }
++    for (;;) {
++        ssize_t count = read(payload, buffer, sizeof(buffer));
++        if (count == 0) { result = 0; break; }
++        if (count < 0) break;
++        for (ssize_t sent = 0; sent < count;) {
++            int n = sceNetSend(socket, buffer + sent, (size_t)(count - sent), 0);
++            if (n <= 0) { log_line("tile: send -> 0x%08x after %ld bytes", (unsigned)n, total); goto done; }
++            sent += n;
++            total += n;
++        }
++    }
++    (void)sceNetShutdown(socket, 1);   /* the payload ends here, whichever way the loader reads */
++    log_line("tile: sent %s (%ld bytes) to the payload loader", tile_paths[TILE_PAYLOAD], total);
++done:
++    sceNetSocketClose(socket);
++    close(payload);
++    return result;
+ }
+ 
+ int main(void)
+ {
+-    char profile[96], target[16] = "PPSA99995", word[112], path[192];
++    char profile[96], target[16] = "PPSA99995", tile[16] = "", path[192];
+ 
+-    if (read_conf(profile, sizeof(profile), target, sizeof(target)) != 0) return 1;
+-    snprintf(path, sizeof(path), TILE_LOG_DIR "/tile-%s.log", profile);
++    if (read_conf(profile, sizeof(profile), target, sizeof(target), tile, sizeof(tile)) != 0)
++        return 1;
++    snprintf(path, sizeof(path), "%s/tile-%s.log", tile_paths[TILE_LOG_DIR], profile);
+     log_file = fopen(path, "a");
+-    snprintf(word, sizeof(word), "profile=%s", profile);
+-    const char *argv[] = { word, "home=1", NULL };
+-
+-    sceUserServiceInitialize(NULL);
+-    int foreground = -1;
+-    if (sceUserServiceGetForegroundUser(&foreground) != 0) foreground = -1;
+-    int login = login_user();
+-    log_line("tile: start %s with %s home=1 (foreground user %d, login user %d)",
+-             target, word, foreground, login);
+-
+-    for (size_t i = 0; i < sizeof(attempts) / sizeof(attempts[0]); i++) {
+-        int user_id = attempts[i].user == TILE_FOREGROUND ? foreground : login;
+-        if (user_id < 0) continue;
+-        lnc_app_param_t param;
+-        memset(&param, 0, sizeof(param));
+-        param.size = (uint32_t)sizeof(param);
+-        param.user_id = user_id;
+-        int rc = attempts[i].call(target, argv, &param);
+-        log_line("tile: %s user %d -> 0x%08x", attempts[i].name, user_id, (unsigned)rc);
+-        if (rc == 0) break;
++    FILE *request = fopen(tile_paths[TILE_REQUEST], "w");
++    if (!request) {
++        log_line("tile: cannot write %s", tile_paths[TILE_REQUEST]);
++        return 1;
+     }
++    fprintf(request, "profile=%s\ntarget=%s\ntile=%s\n", profile, target, tile);
++    fclose(request);
++    log_line("tile: %s asks for %s profile=%s home=1", tile, target, profile);
++    if (send_payload() != 0) unlink(tile_paths[TILE_REQUEST]);
+     if (log_file) fclose(log_file);
+-    /* The tile's work is done; ending it returns the console to whatever
+-     * started (prospero-win, or Home if the launch was refused). */
++    /* Closing hands the console back; the payload starts the game. */
+     return 0;
+ }
+diff --git a/tools/build_tile.sh b/tools/build_tile.sh
+index d09f92a..45f1924 100755
+--- a/tools/build_tile.sh
++++ b/tools/build_tile.sh
+@@ -8,7 +8,8 @@
+ #   tools/build_tile.sh --title-id PPSA99996 --name "NFS Most Wanted" \
+ #       --profile nfs-most-wanted-2005 [--icon art.png] [--target PPSA99995] \
+ #       --out ../release-main/tiles
+-# writes OUT/<title-id>/ (eboot.bin, sce_sys/, sce_module/libc.prx, tile.conf);
++# writes OUT/<title-id>/ (eboot.bin, sce_sys/, sce_module/libc.prx, tile.conf,
++# tile-launch.elf: the payload that starts the game, native/tile/pw_tile_launch.c);
+ # deploy it like the app folder (/data/homebrew/<title-id>). The icon must be
+ # 512x512; without --icon a plain one with the name is drawn.
+ set -euo pipefail
+@@ -55,9 +56,14 @@ mkdir -p "$build" "$app/sce_sys" "$app/sce_module"
+     --stub-dir "$sdk/target/lib" --module-sdk 0x02000009 \
+     --companion-sdk 0x08050001 --file-name eboot.elf
+ "$tool" self --sign --in "$build/eboot.elf" --out "$app/eboot.bin" --magic 0x1D3D154F
++# The payload: built as any PS5 payload is (PS5_Vulkan's ps5vkctl), sent by the tile
++# to the console's payload loader, which can start another title where a sandboxed
++# app cannot.
++PS5_PAYLOAD_SDK="$sdk" "$sdk/bin/prospero-clang" -std=c11 -O2 -Wall -Wextra -Werror \
++    -o "$app/tile-launch.elf" "$root/native/tile/pw_tile_launch.c" -lSceSystemService -lSceUserService
+ cp "$foundation/runtime/libc.prx" "$app/sce_module/libc.prx"
+ chmod 755 "$app/eboot.bin" "$app/sce_module/libc.prx"
+-printf 'profile=%s\ntarget=%s\n' "$profile" "$target" > "$app/tile.conf"
++printf 'profile=%s\ntarget=%s\ntile=%s\n' "$profile" "$target" "$title_id" > "$app/tile.conf"
+ 
+ python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" <<'PY'
+ import json, re, sys
+-- 
+2.56.0
+

@@ -1,0 +1,26 @@
+From b109ec58012c2e741b42d42eb9a0d28c34412c71 Mon Sep 17 00:00:00 2001
+From: lavavex <27239435+lavavex@users.noreply.github.com>
+Date: Sat, 10 Oct 2026 20:02:27 -0500
+Subject: [PATCH 15/24] build_game_app: give prepare-assets.sh the icon its
+ validator requires
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+---
+ tools/build_game_app.sh | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index 3ab390e..63d109a 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -96,6 +96,7 @@ if [[ -n $background ]]; then
+     assets=${PS5_ASSETS_TOOL:-$root/../ps5-vulkan-mp/tools/prepare-assets.sh}
+     [[ -f $assets ]] || { echo "build_game_app: no $assets (ps5-vulkan-mp)" >&2; exit 2; }
+     textures=$(mktemp -d)
++    cp "$app/sce_sys/icon0.png" "$textures/"   # the tool validates its folder as a whole sce_sys
+     bash "$assets" --background "$background" --output-directory "$textures" ||
+         { echo "build_game_app: background conversion failed (make -C ../ps5-vulkan-mp assets-deps?)" >&2; exit 2; }
+     cp "$textures/pic0.dds" "$textures/pic1.dds" "$app/sce_sys/"
+-- 
+2.56.0
+
