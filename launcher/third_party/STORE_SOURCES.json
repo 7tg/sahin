@@ -1,0 +1,46 @@
+[
+  {
+    "repository": "https://github.com/LoupVaillant/Monocypher.git",
+    "commit": "0d85f98c9d9b0227e42cf795cb527dff372b40a4",
+    "files": {
+      "src/third_party/monocypher/monocypher.c": "02174117935699d418443c75a558a287deb06ef8cf7c1adced61d9047d2f323d",
+      "src/third_party/monocypher/monocypher.h": "fcaf6ed771358bb4f40fba016f6518ae86ec02b1b877d2cc35ad92d3a26fd7b3",
+      "src/third_party/monocypher/monocypher-ed25519.c": "97d581639dfa72be08a6d57deb7d79b736be001cb416819cab196d22559d242b",
+      "src/third_party/monocypher/monocypher-ed25519.h": "3a3035181f991a158d0e1c7567258f0bae8ba0f1f23c5512b4a1db1b3c9730ce",
+      "src/third_party/monocypher/LICENCE.md": "a5781770269d2516e52ba4863f790c10a16da4089a1e81823aee19ff1e9026b0"
+    }
+  },
+  {
+    "repository": "https://github.com/ibireme/yyjson.git",
+    "commit": "9ddba001a4ea88e93b46932e5c5b87b222e19a5f",
+    "files": {
+      "src/third_party/yyjson/yyjson.c": "98489c068ab65298320710e5be4c1090af1b5676e41301a3525b2e732641aace",
+      "src/third_party/yyjson/yyjson.h": "adce02aef5dfd868f7c0b632bd23bc0e79fa710b70d93bfe334c2bd15b21a41d",
+      "src/third_party/yyjson/LICENSE": "45e384d3d52c73cba3a64d6e6c25d47cd738cd8a55c30629e3201046eda62947"
+    }
+  },
+  {
+    "repository": "https://github.com/richgel999/miniz.git",
+    "commit": "293d4db1b7d0ffee9756d035b9ac6f7431ef8492",
+    "files": {
+      "src/third_party/miniz/miniz.c": "d8b837863cc6536a270751893a9778c4241467d8906719ae6cb787a62fa797bc",
+      "src/third_party/miniz/miniz.h": "8033197e77c9567de66425939ab6164405e54aa3c60acf9312905d32c8cddc03",
+      "src/third_party/miniz/miniz_common.h": "8b60e76e726dfcf41a338c3a4c54c70038041a21e6314aa54fd3b7f729ea3412",
+      "src/third_party/miniz/miniz_tinfl.c": "9b7edc1fab708166e10f5e90a618a91c95a91496c4692e38160fdae810c1149a",
+      "src/third_party/miniz/miniz_tinfl.h": "040aad2d9ca23c487652c150277d950be12e72c5453ae1f7c6713ed2efd16b4e",
+      "src/third_party/miniz/miniz_tdef.c": "69a1d22a01e698286a7d2a8df90884aa33b4f073e080749e1fce76c5117a5a29",
+      "src/third_party/miniz/miniz_tdef.h": "12b09b189c27aa7d0b0ebe0be2f3021a3bab26fe7b19e9b3b6f5c4df7c21e9df",
+      "src/third_party/miniz/miniz_zip.c": "7179062fdaa868d18e86ae9391fe47316ef4632c5a24fe3d3ce73d6535c7dd5c",
+      "src/third_party/miniz/miniz_zip.h": "c9343f0d251d92f3730d5fe684d4af67aa0bed25d2d1d39d5fd4746a3c63f796",
+      "src/third_party/miniz/LICENSE": "0115478d567121238cf6cc1c0c361926cf07a49d9e4c9e66da97fac6a01646b3"
+    }
+  },
+  {
+    "repository": "https://github.com/okdshin/PicoSHA2.git",
+    "commit": "161cb3fc4170fa7a3eca9e582cebd27cc4d1fe29",
+    "files": {
+      "src/third_party/picosha2/picosha2.h": "b13c180161ffac8d0adc81e033e493c409457c4d1258ab9781ac80579ba3bdd8",
+      "src/third_party/picosha2/LICENSE": "6c30eb1f37554ec4199cb82a8c86d9e7a852da78a757832bebb03ac9ddc44ff1"
+    }
+  }
+]

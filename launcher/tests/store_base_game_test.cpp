@@ -1,0 +1,120 @@
+// Prospero BlackBox - Base games: found without regard to case, checked, imported whole.
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "library/base_game.hpp"
+#include "third_party/miniz/miniz.h"
+#include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <unistd.h>
+
+namespace fs = std::filesystem;
+using namespace store::library;
+
+namespace
+{
+void put(const fs::path &path, const std::string &body)
+{
+    fs::create_directories(path.parent_path());
+    std::ofstream(path, std::ios::binary) << body;
+}
+
+std::uint32_t crc(const std::string &body)
+{
+    return static_cast<std::uint32_t>(
+        mz_crc32(mz_crc32(0, nullptr, 0), reinterpret_cast<const unsigned char *>(body.data()),
+                 body.size()));
+}
+} // namespace
+
+int main()
+{
+    char temporary[] = "/tmp/prospero-base-XXXXXX";
+    assert(mkdtemp(temporary));
+    const fs::path root = temporary;
+
+    // Most Wanted's own manifest is there, and 1.3 is its current release.
+    const Manifest *mw = manifest_for("NFSMW");
+    assert(mw && mw->releases.front().version == std::string("1.3") &&
+           !mw->releases.front().needs_patch && manifest_for("NFSX") == nullptr);
+
+    // A small game of the same shape, its releases told by data.bin.
+    const std::string current(3000, 'c'), older(2000, 'o');
+    const char *folders[] = {"DATA", "MOVIES"};
+    const char *files[] = {"game.exe", "DATA/data.bin"};
+    const Release releases[] = {{"2.0", current.size(), crc(current), false},
+                                {"1.0", older.size(), crc(older), true}};
+    const char *mod_files[] = {"scripts", "dinput8.dll"};
+    const Manifest game{"GAME", folders, files, "DATA/data.bin", releases, mod_files};
+
+    // Nothing anywhere: absent, and the page says where to put it.
+    const fs::path data = root / "data", usb = root / "usb0";
+    fs::create_directories(data);
+    const std::vector<std::string> roots{usb.string()};
+    auto found = locate(data.string(), roots, game);
+    assert(found.state == State::absent && found.detail.find("base-games/GAME") != std::string::npos);
+
+    // On USB, its names in any case: found there, the older release, to be patched.
+    put(usb / "game" / "Game.EXE", "exe");
+    put(usb / "game" / "data" / "DATA.BIN", older);
+    fs::create_directories(usb / "game" / "Movies");
+    put(usb / "game" / "Movies" / "intro.vp6", std::string(5000, 'm'));
+    // What a Mac leaves on a USB drive is not copied.
+    put(usb / "game" / "Movies" / "._intro.vp6", "resource fork");
+    put(usb / "game" / ".DS_Store", "folder view");
+    found = locate(data.string(), roots, game);
+    assert(found.on_usb && found.state == State::needs_patch && found.version == "1.0");
+    assert(find_entry((usb / "game").string(), "data/data.bin") ==
+           (usb / "game" / "data" / "DATA.BIN").string());
+
+    // Copied into base-games whole, with progress up to every byte; then found there.
+    std::uint64_t last = 0, total = 0;
+    std::atomic<bool> cancel{false};
+    std::string error;
+    assert(import_base(found.path, data.string(), game,
+                       [&](const ImportProgress &p)
+                       {
+                           assert(p.done >= last);
+                           last = p.done;
+                           total = p.total;
+                       },
+                       cancel, error));
+    assert(total == 3 + older.size() + 5000 && last == total);
+    assert(!fs::exists(data / "base-games" / "GAME.importing"));
+    assert(!fs::exists(data / "base-games" / "GAME" / ".DS_Store") &&
+           !fs::exists(data / "base-games" / "GAME" / "Movies" / "._intro.vp6"));
+    found = locate(data.string(), roots, game);
+    assert(!found.on_usb && found.state == State::needs_patch);
+    // Never over an existing copy.
+    assert(!import_base((usb / "game").string(), data.string(), game, [](auto &) {}, cancel, error));
+
+    // The current release, missing pieces, mods, an unknown version.
+    const fs::path copy = root / "copy";
+    put(copy / "game.exe", "exe");
+    put(copy / "DATA" / "data.bin", current);
+    fs::create_directories(copy / "MOVIES");
+    assert(inspect(copy.string(), game).state == State::ready);
+    put(copy / "scripts" / "mod.asi", "asi");
+    found = inspect(copy.string(), game);
+    assert(found.state == State::modified && found.detail.find("scripts") != std::string::npos);
+    fs::remove_all(copy / "scripts");
+    put(copy / "DATA" / "data.bin", "something else");
+    assert(inspect(copy.string(), game).state == State::unknown);
+    fs::remove_all(copy / "MOVIES");
+    found = inspect(copy.string(), game);
+    assert(found.state == State::incomplete && found.detail.find("MOVIES") != std::string::npos);
+
+    // A cancelled import leaves nothing behind; a link is refused.
+    fs::remove_all(data / "base-games");
+    cancel = true;
+    assert(!import_base((usb / "game").string(), data.string(), game, [](auto &) {}, cancel, error));
+    assert(error == "Cancelled" && !fs::exists(data / "base-games" / "GAME") &&
+           !fs::exists(data / "base-games" / "GAME.importing"));
+    cancel = false;
+    fs::create_symlink("/etc/passwd", usb / "game" / "link");
+    assert(!import_base((usb / "game").string(), data.string(), game, [](auto &) {}, cancel, error));
+    assert(error.find("link") != std::string::npos);
+
+    fs::remove_all(root);
+    std::cout << "Base game checks passed\n";
+}

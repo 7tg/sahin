@@ -1,0 +1,56 @@
+[
+  {
+    "component": "curl",
+    "repository": "https://github.com/curl/curl",
+    "ref": "curl-8_18_0",
+    "path": "COPYING",
+    "blob": "3fa85ebb641ce13a2baee669f19603e5b1081851",
+    "file": "assets/licenses/curl.txt",
+    "sha256": "e18f1989333b70044b2adfb7dc2f905d0119dbdcac3bc9f4bc9d540e3a29de5b"
+  },
+  {
+    "component": "openssl",
+    "repository": "https://github.com/openssl/openssl",
+    "ref": "openssl-3.5.2",
+    "path": "LICENSE.txt",
+    "blob": "49cc83d2ee29d13453188217f0e4edd70c7f842f",
+    "file": "assets/licenses/openssl.txt",
+    "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+  },
+  {
+    "component": "zlib",
+    "repository": "https://github.com/madler/zlib",
+    "ref": "v1.3.2",
+    "path": "LICENSE",
+    "blob": "b7a69d058e616651eae27b3f90c0b7fd36c099b2",
+    "file": "assets/licenses/zlib.txt",
+    "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+  },
+  {
+    "component": "zstd",
+    "repository": "https://github.com/facebook/zstd",
+    "ref": "v1.5.6",
+    "path": "LICENSE",
+    "blob": "75800288cc243f164b9d130f125e2ffae28f8e39",
+    "file": "assets/licenses/zstd.txt",
+    "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+  },
+  {
+    "component": "libpsl",
+    "repository": "https://github.com/rockdaboot/libpsl",
+    "ref": "0.21.5",
+    "path": "COPYING",
+    "blob": "85945e764990021c40c3badb34f29bcf5fdd8149",
+    "file": "assets/licenses/libpsl.txt",
+    "sha256": "322392e6001b2b3b0fca705dc9f11f26e12441188ecde50eb1d22909980b2925"
+  },
+  {
+    "component": "public-suffix-list",
+    "repository": "https://github.com/publicsuffix/list",
+    "ref": "main",
+    "path": "LICENSE",
+    "blob": "ee6256cdb62a765749a71aae3abea32884301cd1",
+    "file": "assets/licenses/public-suffix-list.txt",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+  }
+]

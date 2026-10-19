@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/nothings/stb",
+  "commit": "2c980bb59875b0d32144a71867fbdebb2f77cd20",
+  "file": "stb_image.h",
+  "sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3",
+  "license": "MIT or public domain; full license in the header"
+}

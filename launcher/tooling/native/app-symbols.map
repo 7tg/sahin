@@ -1,0 +1,13 @@
+/*
+ * ps5-native-app-boilerplate - Application symbol visibility policy.
+ * Copyright (C) 2026 BlackBearReloaded
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * The converter does not publish application exports. Static libraries and
+ * replacement allocation operators therefore stay internal to the executable.
+ */
+
+{
+    local:
+        *;
+};
