@@ -3,3 +3,6 @@
 # Wine's Windows modules (host Wine and Wine's PS5 modules, wowprospero, wow64native):
 win/wine/lib/wine/i386-windows/*
 win/wine/lib/wine/x86_64-windows/*
+# Mesa's WGL/Zink (opengl32.dll and its driver), built from PS5_Mesa:
+win/mesa-zink/i386-windows/*
+win/mesa-zink/x86_64-windows/*
