@@ -262,6 +262,13 @@ class Screen
     {
         return single_game_;
     }
+    // A notice first on a game's own page (the game closed right after it started).
+    void set_single_notice(std::string text)
+    {
+        single_notice_ = std::move(text);
+        if (page_app())
+            refresh_detail();
+    }
     // The in-game menu's choices: applied once the page knows the game is installed.
     void set_ingame(InGame choices)
     {
@@ -457,6 +464,7 @@ class Screen
     // The plan's options as chosen on the page; empty until the install is known.
     std::vector<library::OptionView> single_options_;
     int single_row_ = 0; // the page's row the D-pad is on
+    std::string single_notice_;
     bool play_after_ = false; // the in-game choices' job, then the game
     void open_game_settings(const App &app, hui::ui::Feedback &feedback);
     Activity activity_;

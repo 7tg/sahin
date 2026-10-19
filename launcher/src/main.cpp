@@ -4,6 +4,7 @@
 
 #include "app/store.hpp"
 #include "app/service.hpp"
+#include "app/early_exit.hpp"
 #include "audio/cues.hpp"
 #include "audio/music.hpp"
 #include "core/frame_stats.hpp"
@@ -41,6 +42,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <cstdlib>
+#include <ctime>
 #include <map>
 #include <mutex>
 #include <GL/glcorearb.h>
@@ -162,9 +164,14 @@ bool square_held()
     return false;
 }
 
+// The game's last start, for the next start of this app to tell a game that closed at once.
+constexpr const char *kLastStart = "/data/sahin/last-start";
+
 [[noreturn]] void play_single_game(const char *why)
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
+    if (!store::mark_start(kLastStart, std::time(nullptr)))
+        hui::sys::log("[STORE] %s not written", kLastStart);
     const char *none[] = {nullptr};
     const int refused = sceSystemServiceLoadExec("/app0/game.bin", none);
     hui::sys::log("[STORE] LoadExec /app0/game.bin refused rc=0x%08x", static_cast<unsigned>(refused));
@@ -275,8 +282,14 @@ int main()
     // game's in-game menu left choices to apply (or asked for this screen), or when Square is
     // held as it starts; otherwise the tile goes straight into the game.
     const auto ingame = kSingleGame[0] && elevated ? take_ingame_choices(storage_root) : std::nullopt;
-    if (kSingleGame[0] && elevated && !ingame && single_game_installed(app_root, storage_root) &&
-        !square_held())
+    const bool installed = kSingleGame[0] && elevated && single_game_installed(app_root, storage_root);
+    // The game back within seconds of its start: it closed at once. The page says why, once.
+    const bool closed_early = installed && store::early_exit(kLastStart, std::time(nullptr));
+    if (kSingleGame[0] && elevated)
+        (void)unlink(kLastStart);
+    if (closed_early)
+        sys::log("[STORE] the game closed right after it started: the page instead");
+    if (installed && !ingame && !closed_early && !square_held())
         play_single_game("installed");
     request_path = std::string(storage_root) + "/dev/request.txt";
     handled_path = std::string(storage_root) + "/handled.txt";
@@ -366,6 +379,8 @@ int main()
         screen.set_single_game(kSingleGame); // straight to the game's page, no intro
         if (ingame)
             screen.set_ingame(*ingame);
+        if (closed_early)
+            screen.set_single_notice(store::kEarlyExitHint);
     }
     else
         screen.play_intro();

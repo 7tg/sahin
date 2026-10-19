@@ -5,6 +5,7 @@
 #include "app/ambient.hpp"
 #include "app/keyboard_map.hpp"
 #include "app/store.hpp"
+#include "app/early_exit.hpp"
 #include "catalog/blackbox.hpp"
 #include "catalog/icons.hpp"
 #include "core/image.hpp"
@@ -519,6 +520,8 @@ int main(int argc, char **argv)
                 {
                     // The game's own app: its page only (installed, the player quit to it).
                     screen.set_single_game("PPSA99404");
+                    if (mode == "mw-solo-installed-closed") // Blur closed at once last time
+                        screen.set_single_notice(store::kEarlyExitHint);
                 }
                 assert(screen.open_app("PPSA99404"));
                 settle(90);

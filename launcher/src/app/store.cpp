@@ -649,6 +649,8 @@ void Screen::refresh_detail()
                                           "Check with its developer before using it."));
     if (!app.detail_error.empty())
         blocks.push_back(Block::paragraph("Details unavailable: " + app.detail_error));
+    if (!single_game_.empty() && !single_notice_.empty())
+        blocks.push_back(Block::paragraph(single_notice_));
     if (!single_game_.empty() && app.base_known && !app.game_installed)
     {
         // A game's own app before its install: what a new player has to do, not a description.
