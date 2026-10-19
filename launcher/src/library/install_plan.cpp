@@ -390,6 +390,16 @@ bool parse_plan(std::string_view text, InstallPlan &out, std::string &error)
         else
             plan.pending.emplace_back(yyjson_get_str(item), yyjson_get_len(item));
     }
+    auto *strip = array(read, root, "strip");
+    yyjson_arr_foreach(strip, index, count, item)
+    {
+        if (!yyjson_is_str(item))
+            read.fail("strip: every item must be text");
+        else if (std::string path(yyjson_get_str(item), yyjson_get_len(item)); !safe_relative(path))
+            read.fail("strip: " + path + " isn't a path inside the game's folder");
+        else
+            plan.strip.push_back(std::move(path));
+    }
     if (auto *touchpad = yyjson_obj_get(root, "touchpad"))
     {
         if (!yyjson_is_obj(touchpad))

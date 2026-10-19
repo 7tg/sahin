@@ -94,33 +94,17 @@ int main()
     const std::atomic<bool> go{false};
     std::string error;
 
-    // MW's own plan, as shipped (the base tier: vanilla 1.3 and the quality-of-life mods),
-    // reads and checks out.
-    InstallPlan mw;
-    assert(load_plan(STORE_ASSETS "/plans/NFSMW.json", mw, error));
-    assert(mw.game == "NFSMW" && mw.release == "1.3" && mw.prefix == "nfs-blackbox" &&
-           mw.profile.id == "pb-nfsmw" && mw.profile.width == 3840 &&
-           mw.source("speed-exe") && mw.source("speed-exe")->size == 6029312 &&
-           mw.pending.empty() && mw.game_files.size() == 11 && mw.system_files.empty() &&
-           mw.patches.size() == 2 && mw.expect.size() == 4 && mw.touchpad_ini.size() == 1 && mw.machine.size() == 4 &&
-           mw.upgrades.size() == 1 && mw.upgrades[0].from == "1.2" && !mw.upgrades[0].rtpatch &&
-           mw.source(mw.upgrades[0].source));
-    // The DRM-free exe gets the frame-limiter and large-address-aware bytes.
-    assert(mw.patches[0].offset == 0x242ED2 && mw.patches[0].from == "\xe8\x29\xa0\x00\x00"s &&
-           mw.patches[0].to == std::string(5, '\x90') && mw.patches[1].offset == 0x11E &&
-           mw.patches[1].from == "\x0f" && mw.patches[1].to == "\x2f");
-    for (const auto &value : mw.machine)
-        assert(value.key == "Software\\Wow6432Node\\EA Games\\Need for Speed Most Wanted");
-    for (const auto &placement : mw.game_files)
-        assert(placement.to.find("glassreflectshader") == std::string::npos);
-    // Its one option, the Xbox 360 look: off unless chosen, no glass shader either.
-    assert(mw.options.size() == 1 && mw.options[0].id == "x360" && !mw.options[0].on &&
-           mw.options[0].game_files.size() == 168 && mw.options[0].system_files.size() == 2 &&
-           mw.options[0].expect.size() == 3 && mw.options[0].dll_overrides == ";d3dx9_26,d3dx9_43=n");
-    for (const auto &placement : mw.options[0].game_files)
-        assert(placement.to.find("glassreflectshader") == std::string::npos);
+    // Blur's own plan, as shipped, reads and checks out.
+    InstallPlan blur;
+    assert(load_plan(STORE_ASSETS "/plans/BLUR.json", blur, error));
+    assert(blur.game == "BLUR" && blur.release == "1.2" && blur.prefix == "sahin" &&
+           blur.profile.id == "pb-blur" && blur.profile.width == 3840 && blur.pending.empty() &&
+           blur.game_files.size() == 1 && blur.game_files[0].to == "dsound.dll" &&
+           blur.options.size() == 2 && blur.option("online") && blur.upgrades.empty());
+    // What earlier mod installs left behind is stripped from the copy.
+    assert(blur.strip.size() == 8 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
     std::string profile;
-    assert(profile_text(mw.profile, profile, error));
+    assert(profile_text(blur.profile, profile, error));
 
     // A small game of the same shape: releases told by data.bin, 2.0 current.
     const std::string current(3000, 'c'), older(2000, 'o');
@@ -129,7 +113,8 @@ int main()
     const Release releases[] = {{"2.0", current.size(), crc(current), false},
                                 {"1.0", older.size(), crc(older), true}};
     const char *mod_files[] = {"scripts"};
-    const Manifest game{"GAME", folders, files, "DATA/data.bin", releases, mod_files};
+    Manifest game{"GAME", folders, files, "DATA/data.bin", releases, mod_files};
+    game.mods_left_out = true; // a copy with mods in it is installed from, without them
 
     // Mod files: a fixed exe, a zip with a loader and a scripts folder, a system DLL.
     const std::string exe = "fixed exe", loader = "loader dll", asi = "plugin",
@@ -193,10 +178,12 @@ int main()
         " \"dll_overrides\": \"dinput8=n,b\", \"width\": 1920, \"height\": 1080,"
         " \"runtime\": {\"fast_clock\": \"true\"}, \"after\": \"other.profile\"},"
         " \"upgrades\": [{\"from\": \"1.0\", \"source\": \"up\"}],"
+        " \"strip\": [\"dsound.dll\", \"scripts\"],"
         " \"pending\": [\"A mod with no source yet\"]}";
     InstallPlan plan;
     assert(parse_plan(plan_text, plan, error));
     assert(plan.pending.size() == 1 && plan.source("mods")->url == "https://example.com/mods.zip");
+    assert(plan.strip.size() == 2 && plan.strip[1] == "scripts");
 
     // Plans that would write outside their folders, or name what isn't there, are refused.
     const auto refused = [&](std::string from, std::string to)
@@ -214,6 +201,8 @@ int main()
     assert(refused("\"member\": \"scripts/\"", "\"member\": \"../\""));
     assert(refused("{\"source\": \"exe\", \"to\": \"game.exe\"}", "{\"source\": \"nope\", \"to\": \"x\"}"));
     assert(refused("\"schema\": 1", "\"schema\": 2"));
+    assert(refused("\"strip\": [\"dsound.dll\"", "\"strip\": [\"../x\"") && error.find("strip") != std::string::npos);
+    assert(refused("\"strip\": [\"dsound.dll\"", "\"strip\": [3") && error.find("strip") != std::string::npos);
     assert(refused("\"source\": \"up\"}", "\"source\": \"up\", \"kind\": \"bsdiff\"}"));
     assert(!plan.upgrades[0].rtpatch);
     {
@@ -317,6 +306,18 @@ int main()
     put(base / "data" / "data.bin", current);
     fs::remove(base / "data" / "extra.bin");
     fs::remove(base / "data" / "gone.txt");
+
+    // Mods an earlier install left in the user's copy are left out of the install (the plan's
+    // strip list, in any case), and the copy itself stays as it is.
+    put(base / "Dsound.dll", "old mod loader");
+    put(base / "scripts" / "a.asi", "old plugin");
+    assert(install_game(plan, game, paths, options, progress, go, error));
+    assert(!fs::exists(installed / "dsound.dll") && !fs::exists(installed / "Dsound.dll"));
+    assert(!fs::exists(installed / "scripts" / "a.asi") &&
+           read(installed / "scripts" / "Mod.asi") == asi); // the plan's own scripts are there
+    assert(read(base / "scripts" / "a.asi") == "old plugin" && read(base / "Dsound.dll") == "old mod loader");
+    fs::remove(base / "Dsound.dll");
+    fs::remove_all(base / "scripts");
 
     // The install.
     steps.clear();

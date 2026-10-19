@@ -93,6 +93,10 @@ struct InstallPlan
     // Pieces of the finished setup the plan can't install yet (no pinned source):
     // an install with any refuses to start unless it is told to go without them.
     std::vector<std::string> pending;
+    // Paths in the game's folder that go from the copy before the plan's files are added
+    // (case-insensitive; a folder goes with what is in it): what earlier mod installs left in
+    // the user's copy. The copy itself is never changed.
+    std::vector<std::string> strip;
     // Older releases of the base copy this plan installs from: each one's upgrade (a
     // Source) brings a copy of it up to release first. "kind": "zip" (the default) is our
     // own upgrade file (upgrade.hpp); "rtpatch" is the publisher's patch (rtpatch.hpp).

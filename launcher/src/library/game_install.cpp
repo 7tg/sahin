@@ -715,6 +715,10 @@ bool install_game(const InstallPlan &given, const Manifest &manifest, const Inst
         remove_all(work);
         return false;
     };
+    // What earlier mod installs left in the copy goes: the plan adds its own.
+    for (const auto &relative : plan.strip)
+        if (const auto found = find_entry(work, relative); !found.empty())
+            remove_all(found);
     if (!upgrade.empty())
     {
         step("Upgrading to " + plan.release);
