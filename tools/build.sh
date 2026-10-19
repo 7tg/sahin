@@ -11,6 +11,9 @@
 # with release/SHA256SUMS, are copied to release/. The same commit gives the same SHA256SUMS.
 # x86-64 Linux only: the prefix step runs 32-bit x86 Wine.
 #
+# The launcher needs ps5-opengl-sdk-1.0.0.tar.gz (sha256 f93643c0...) in downloads/: its
+# release download is gone.
+#
 # STEPs, in order:
 #   setup title radv zink hostwine wineps5 cpu pkg apps dxvk prefix
 #             tools/build-prospero-win.sh's steps
@@ -89,6 +92,13 @@ if want game-app; then
     # The launcher (GNUmakefile GAME=PPSA99404) as eboot.bin, prospero-win's runner (the apps
     # step) as game.bin, with the bundle.
     echo '==> game-app'
+    # The launcher's pinned ps5-opengl SDK: its release address is gone (404), so a copy put
+    # in the working copy's downloads/ is used; launcher/tools/fetch-opengl-sdk.sh checks
+    # its hash before unpacking it.
+    sdk=ps5-opengl-sdk-1.0.0.tar.gz
+    if [[ -f /src/sahin/downloads/\$sdk && ! -d \$L/.deps/ps5-opengl/ps5-opengl-sdk-1.0.0/sdk ]]; then
+        mkdir -p \$L/.deps/ps5-opengl && cp /src/sahin/downloads/\$sdk \$L/.deps/ps5-opengl/
+    fi
     make -C \$L USE_CCACHE=0 GAME=PPSA99404 app
     D=\$L/dist/PPSA99404
     rm -rf \$D/assets/bundle && cp -a \$L/assets/bundle \$D/assets/bundle
