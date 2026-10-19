@@ -146,7 +146,7 @@ Inventory scan_installed(const ScanPolicy &policy, const std::string &receipts,
             app.path = path;
             app.name = basename(path);
             app.image = true;
-            app.reason = "Image installed outside Prospero BlackBox. Not managed by this app.";
+            app.reason = "Image installed outside Sahin. Not managed by this app.";
             result.apps.push_back(std::move(app));
             continue;
         }
@@ -182,7 +182,7 @@ Inventory scan_installed(const ScanPolicy &policy, const std::string &receipts,
                           clean_absolute_path(receipt.location) && receipt.location == parent &&
                           receipt.content_version == app.version;
             if (!app.managed)
-                app.reason = "Installed outside Prospero BlackBox. Not managed by this app.";
+                app.reason = "Installed outside Sahin. Not managed by this app.";
             result.apps.push_back(std::move(app));
             continue;
         }

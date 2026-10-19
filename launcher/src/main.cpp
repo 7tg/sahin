@@ -210,11 +210,11 @@ int main()
     const auto debug_wanted = []
     {
         std::string saved;
-        return hui::save::read_file("/data/nfs-blackbox/settings.txt", &saved, 4096) &&
+        return hui::save::read_file("/data/sahin/settings.txt", &saved, 4096) &&
                store::parse_settings(saved).debug_log;
     };
     store::diag::set_enabled(debug_wanted());
-    store::diag::trace("Prospero BlackBox started");
+    store::diag::trace("Sahin started");
     store::diag::trace_firmware();
     store::diag::trace("keyboard library 0x%08x, usb keyboards 0x%08x, title registry 0x%08x",
                        static_cast<unsigned>(keyboard_module),
@@ -229,7 +229,7 @@ int main()
 #else
     const auto elevation_status = elevation::request(elevation::Capability::filesystem);
 #endif
-    constexpr const char *storage_root = "/data/nfs-blackbox";
+    constexpr const char *storage_root = "/data/sahin";
     const bool elevated = elevation_status == elevation::Status::ok;
     // Wherever the store is installed (system/app_folder.hpp), now that the root may have changed.
     const std::string app_root = store::system::app_folder();
@@ -378,7 +378,7 @@ int main()
                      descriptor >= 0 ? "kept in the store folder" : "nowhere to keep them");
 #ifdef STORE_DEBUG_TRACE
             store::diag::trace("settings: %s", descriptor >= 0
-                                                   ? "kept in /data/nfs-blackbox (no elevation)"
+                                                   ? "kept in /data/sahin (no elevation)"
                                                    : "can't be kept (no store folder)");
 #endif
         }
@@ -490,7 +490,7 @@ int main()
     [[maybe_unused]] std::string press_keys; // development: buttons still to press
     [[maybe_unused]] std::int64_t press_next = 0;
     [[maybe_unused]] bool shot_wanted = false;       // development: save the next frame
-    [[maybe_unused]] std::string shot_name = "shot"; // ... as /data/nfs-blackbox/dev/<name>.tga
+    [[maybe_unused]] std::string shot_name = "shot"; // ... as /data/sahin/dev/<name>.tga
     [[maybe_unused]] int bench_step = -1;
     ps5::Ime keyboard;
     bool keyboard_active = false;
@@ -830,7 +830,7 @@ int main()
                 std::string digest;
                 save::read_file(std::string(storage_root) + "/dev/self.sha256", &digest, 80);
                 entry.id = "PPSA99400";
-                entry.name = "Prospero BlackBox";
+                entry.name = "Sahin";
                 entry.status = "available";
                 entry.format = "zip";
                 entry.version = argument;
@@ -883,7 +883,7 @@ int main()
             }
             else if (verb == "fsbench")
             {
-                // The folder to measure, e.g. /data/nfs-blackbox/staging.
+                // The folder to measure, e.g. /data/sahin/staging.
                 static std::string bench_root;
                 bench_root = argument;
                 pthread_t thread;
@@ -1006,7 +1006,7 @@ int main()
                                         ? std::string("https://")
                                         : screen.settings().catalog_url,
                                     512, ps5::Ime::Enter::go)
-                    : keyboard.open("Search Prospero BlackBox", "App name or developer",
+                    : keyboard.open("Search Sahin", "App name or developer",
                                     screen.query());
             sys::log("[STORE] keyboard open=%d", keyboard_active ? 1 : 0);
             if (!keyboard_active)
@@ -1126,7 +1126,7 @@ int main()
 #ifdef STORE_DEVELOPMENT
         if (shot_wanted)
         {
-            // What the TV shows, at half size: /data/nfs-blackbox/dev/shot.tga.
+            // What the TV shows, at half size: /data/sahin/dev/shot.tga.
             shot_wanted = false;
             const int w = display.width(), h = display.height(), hw = w / 2, hh = h / 2;
             std::vector<std::uint8_t> pixels(static_cast<std::size_t>(w) * h * 4);
@@ -1151,7 +1151,7 @@ int main()
                     tga.push_back(static_cast<char>(px[0]));
                 }
             const auto error =
-                hui::save::write_atomic("/data/nfs-blackbox/dev/" + shot_name + ".tga", tga);
+                hui::save::write_atomic("/data/sahin/dev/" + shot_name + ".tga", tga);
             sys::log("[STORE] shot %dx%d gl=0x%x saved=%d", hw, hh, glGetError(),
                      error.empty() ? 1 : 0);
         }

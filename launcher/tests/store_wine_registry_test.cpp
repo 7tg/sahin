@@ -23,7 +23,7 @@ const char kUser[] = "WINE REGISTRY Version 2\n"
                      "\"Big\"=hex:00,01,02,03,04,05,06,07,08,09,0a,0b,0c,0d,0e,0f,10,11,12,13,\\\n"
                      "  14,15,16,17\n"
                      "\n"
-                     "[Software\\\\EA Games\\\\Need for Speed Most Wanted] 1791414901\n"
+                     "[Software\\\\Sahin Games\\\\Blur] 1791414901\n"
                      "#time=1dd56b1adfaa5ca\n"
                      "@=\"INSERTYOURCDKEYHERE\"\n"
                      "\"CD Drive\"=\"D:\\\\\"\n"
@@ -33,7 +33,7 @@ const char kUser[] = "WINE REGISTRY Version 2\n"
                      "[Software\\\\Wine\\\\DllOverrides] 1791414550\n"
                      "#time=1dd56b0dc933808\n"
                      "\"d3d9\"=\"native\"\n";
-const std::string kMw = "Software\\EA Games\\Need for Speed Most Wanted";
+const std::string kMw = "Software\\Sahin Games\\Blur";
 } // namespace
 
 int main(int argc, char **argv)
@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     assert(!registry.parse("REGEDIT4\n", error) && !error.empty());
 
     // Keys and names match without regard to case; @ is the empty name.
-    assert(registry.has_key("software\\ea games\\NEED FOR SPEED MOST WANTED"));
+    assert(registry.has_key("software\\sahin games\\BLUR"));
     assert(registry.dword(kMw, "G_RACINGRESOLUTION") == 0x87800438u);
     assert(registry.string_value(kMw, "") == "INSERTYOURCDKEYHERE");
     assert(registry.string_value(kMw, "CD Drive") == "D:\\");
@@ -72,21 +72,21 @@ int main(int argc, char **argv)
 
     // A key the file lacks: appended, stamped, set off by a blank line; quotes and
     // backslashes escaped as Wine escapes them.
-    const std::string hklm = "Software\\Wow6432Node\\EA Games\\Need for Speed Most Wanted";
-    assert(registry.set_string(hklm, "Install Dir", "C:\\Games\\NFSMW\\", 1791500000));
+    const std::string hklm = "Software\\Wow6432Node\\Sahin Games\\Blur";
+    assert(registry.set_string(hklm, "Install Dir", "C:\\Games\\BLUR\\", 1791500000));
     assert(registry.set_string(hklm, "Quote", "say \"hi\"", 1791500000));
     assert(!registry.set_string(hklm, "Bad", "line\nbreak", 1791500000));
     assert(!registry.set_dword("", "x", 1, 1791500000));
     const std::string text = registry.text();
     const std::string block = "\"d3d9\"=\"native\"\n\n"
-                              "[Software\\\\Wow6432Node\\\\EA Games\\\\Need for Speed Most Wanted] "
+                              "[Software\\\\Wow6432Node\\\\Sahin Games\\\\Blur] "
                               "1791500000\n#time=1dd5777d0653000\n"
-                              "\"Install Dir\"=\"C:\\\\Games\\\\NFSMW\\\\\"\n"
+                              "\"Install Dir\"=\"C:\\\\Games\\\\BLUR\\\\\"\n"
                               "\"Quote\"=\"say \\\"hi\\\"\"\n\n";
     assert(text.ends_with(block));
     WineRegistry again;
     assert(again.parse(text, error) && again.text() == text);
-    assert(again.string_value(hklm, "Install Dir") == "C:\\Games\\NFSMW\\");
+    assert(again.string_value(hklm, "Install Dir") == "C:\\Games\\BLUR\\");
     assert(again.string_value(hklm, "Quote") == "say \"hi\"");
 
     // Saved whole and read back.

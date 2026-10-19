@@ -9,7 +9,7 @@
 
 namespace store::library
 {
-// EA shipped Most Wanted 1.3 as an RTPatch self-extractor (Patch.v1.3.exe): a Windows
+// A publisher can ship a game update as an RTPatch self-extractor (Patch.exe): a Windows
 // program with the patch appended. The console can't run it, and we wouldn't: the patch
 // is found after the program, parsed and decoded here (docs/rtpatch-format.md).
 //

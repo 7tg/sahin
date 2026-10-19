@@ -15,13 +15,13 @@ namespace
 GameProfile most_wanted()
 {
     GameProfile p;
-    p.comment = {"NFS Most Wanted: written by Prospero BlackBox."};
-    p.id = "nfs-most-wanted-2005";
-    p.name = "NFS Most Wanted";
-    p.executable = "C:\\Games\\NFSMW\\speed.exe";
-    p.working_directory = "C:\\Games\\NFSMW";
+    p.comment = {"Blur: written by Sahin."};
+    p.id = "blur";
+    p.name = "Blur";
+    p.executable = "C:\\Games\\BLUR\\Blur.exe";
+    p.working_directory = "C:\\Games\\BLUR";
     p.dll_overrides = "d3d8,d3d9,d3d10core,d3d11,dxgi=n;dinput8,dsound=n,b;d3dx9_26,d3dx9_43=n";
-    p.prefix = "nfs-blackbox";
+    p.prefix = "sahin";
     p.width = 3840;
     p.height = 2160;
     p.switches = {{"fast_clock", "true"}, {"shared_input", "true"}, {"thread_scheduling", "true"}};
@@ -41,15 +41,15 @@ int main()
     // Today's console profile, without its [debug] lines.
     std::string text, error;
     assert(profile_text(most_wanted(), text, error));
-    assert(text == "; NFS Most Wanted: written by Prospero BlackBox.\n"
+    assert(text == "; Blur: written by Sahin.\n"
                    "[application]\n"
-                   "id = nfs-most-wanted-2005\n"
-                   "name = NFS Most Wanted\n"
-                   "executable = C:\\Games\\NFSMW\\speed.exe\n"
-                   "working_directory = C:\\Games\\NFSMW\n"
+                   "id = blur\n"
+                   "name = Blur\n"
+                   "executable = C:\\Games\\BLUR\\Blur.exe\n"
+                   "working_directory = C:\\Games\\BLUR\n"
                    "dll_overrides = d3d8,d3d9,d3d10core,d3d11,dxgi=n;dinput8,dsound=n,b;"
                    "d3dx9_26,d3dx9_43=n\n"
-                   "prefix = nfs-blackbox\n"
+                   "prefix = sahin\n"
                    "runtime = wine-wow64\n"
                    "architecture = pe32\n"
                    "graphics = dxvk\n"
@@ -66,13 +66,13 @@ int main()
         const bool ok = profile_text(p, out, error);
         return !ok && out == "unchanged" && !error.empty();
     };
-    assert(refused([](GameProfile &p) { p.id = "NFS-MW"; }));
+    assert(refused([](GameProfile &p) { p.id = "BLUR"; }));
     assert(refused([](GameProfile &p) { p.id = std::string(60, 'a'); })); // too long a file name
     assert(refused([](GameProfile &p) { p.name = "two\nlines"; }));
-    assert(refused([](GameProfile &p) { p.executable = "C:/Games/NFSMW/speed.exe"; }));
-    assert(refused([](GameProfile &p) { p.executable = "C:\\Games\\..\\speed.exe"; }));
-    assert(refused([](GameProfile &p) { p.executable = "C:\\Games\\NFSMW\\speed.bat"; }));
-    assert(refused([](GameProfile &p) { p.working_directory = "Games\\NFSMW"; }));
+    assert(refused([](GameProfile &p) { p.executable = "C:/Games/BLUR/Blur.exe"; }));
+    assert(refused([](GameProfile &p) { p.executable = "C:\\Games\\..\\Blur.exe"; }));
+    assert(refused([](GameProfile &p) { p.executable = "C:\\Games\\BLUR\\Blur.bat"; }));
+    assert(refused([](GameProfile &p) { p.working_directory = "Games\\BLUR"; }));
     assert(refused([](GameProfile &p) { p.dll_overrides = "d3d9 = n"; }));
     assert(refused([](GameProfile &p) { p.prefix = "../other"; }));
     assert(refused([](GameProfile &p) { p.graphics = "vulkan"; }));
@@ -93,15 +93,15 @@ int main()
            text.find("[input]\nmode = xinput\nmouse = touchpad\ntouchpad = mouse_left\n") != std::string::npos);
 
     // profiles.lst: added once, after the line asked for, other lines kept.
-    std::string list = "minesweeper.profile\n# games\nnfs-most-wanted-2005.profile\npinball.profile";
-    assert(list_add(list, "pb-mw.profile", "nfs-most-wanted-2005.profile", error));
-    assert(list == "minesweeper.profile\n# games\nnfs-most-wanted-2005.profile\npb-mw.profile\n"
+    std::string list = "minesweeper.profile\n# games\nblur.profile\npinball.profile";
+    assert(list_add(list, "pb-mw.profile", "blur.profile", error));
+    assert(list == "minesweeper.profile\n# games\nblur.profile\npb-mw.profile\n"
                    "pinball.profile\n");
     const auto before = list;
     assert(list_add(list, "pb-mw.profile", "", error) && list == before);
     assert(list_add(list, "  carbon.profile", "", error) == false); // not a name prospero-win lists
-    assert(list_add(list, "nfs-carbon.profile", "missing.profile", error) &&
-           list.ends_with("pinball.profile\nnfs-carbon.profile\n"));
+    assert(list_add(list, "other-game.profile", "missing.profile", error) &&
+           list.ends_with("pinball.profile\nother-game.profile\n"));
     assert(list_remove(list, "pb-mw.profile") && list.find("pb-mw") == std::string::npos);
     assert(!list_remove(list, "pb-mw.profile"));
     std::string full;
@@ -116,9 +116,9 @@ int main()
     assert(mkdtemp(temporary));
     const fs::path profiles = temporary;
     assert(install_profile(profiles.string(), most_wanted(), "minesweeper.profile", error));
-    assert(read(profiles / "profiles.lst") == "nfs-most-wanted-2005.profile\n");
+    assert(read(profiles / "profiles.lst") == "blur.profile\n");
     assert(profile_text(most_wanted(), text, error) &&
-           read(profiles / "nfs-most-wanted-2005.profile") == text);
+           read(profiles / "blur.profile") == text);
     assert(hui::save::write_atomic((profiles / "profiles.lst").string(),
                                           "minesweeper.profile\npinball.profile\n")
                .empty());

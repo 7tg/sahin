@@ -12,7 +12,7 @@ int main()
     std::string error;
     assert(scan_policy("", "", policy, error));
     assert(policy.roots.size() == 34 && policy.depth == 1);
-    assert(work_path_unscanned(policy, "/mnt/ext1/nfs-blackbox/staging/PPSA99001"));
+    assert(work_path_unscanned(policy, "/mnt/ext1/sahin/staging/PPSA99001"));
     assert(!work_path_unscanned(policy, "/mnt/ext1/PPSA99001"));
     assert(scan_policy("SCANPATH = /mnt/ext1/homebrew/ ; note\nscanpath=/data/homebrew\n"
                        "recursive_scan=YES\nscan_depth=1\n",
@@ -21,15 +21,15 @@ int main()
     assert(std::find(policy.roots.begin(), policy.roots.end(), "/data/custom") ==
            policy.roots.end());
     assert(!work_path_unscanned(policy, "/data/custom/PPSA99002/nested"));
-    assert(work_path_unscanned(policy, "/data/nfs-blackbox/staging/PPSA99002"));
+    assert(work_path_unscanned(policy, "/data/sahin/staging/PPSA99002"));
     // A stray "/" or drive line in manual.lst is no scanned place; a game folder still is.
     assert(scan_policy("", "/\n/data\n/mnt/usb0\n/data/custom/PPSA99002\n", policy, error));
     assert(policy.manual.size() == 4);
-    assert(work_path_unscanned(policy, "/data/nfs-blackbox/staging/PPSA99002"));
-    assert(work_path_unscanned(policy, "/mnt/usb0/nfs-blackbox/staging/PPSA99002"));
+    assert(work_path_unscanned(policy, "/data/sahin/staging/PPSA99002"));
+    assert(work_path_unscanned(policy, "/mnt/usb0/sahin/staging/PPSA99002"));
     assert(!work_path_unscanned(policy, "/data/custom/PPSA99002/nested"));
-    assert(scan_policy("scanpath=/data/nfs-blackbox\nscan_depth=2", "", policy, error));
-    assert(!work_path_unscanned(policy, "/data/nfs-blackbox/staging/PPSA99002"));
+    assert(scan_policy("scanpath=/data/sahin\nscan_depth=2", "", policy, error));
+    assert(!work_path_unscanned(policy, "/data/sahin/staging/PPSA99002"));
     assert(scan_policy("scanpath=/data/../system", "", policy, error) && policy.fell_back);
     assert(std::find(policy.roots.begin(), policy.roots.end(), "/system") == policy.roots.end());
     // A doubled slash or quotes are tidied; a line that still can't be read is left out
@@ -51,7 +51,7 @@ int main()
                        error));
     assert(policy.roots.size() == 5 && policy.roots[2] == "/mnt/ext1/data/homebrew" &&
            policy.ignored.empty() && policy.manual.size() == 3);
-    assert(work_path_unscanned(policy, "/mnt/ext1/nfs-blackbox/staging/PPSA99109"));
+    assert(work_path_unscanned(policy, "/mnt/ext1/sahin/staging/PPSA99109"));
     // Custom scan paths and none readable: the built-in folders are used, and it is said.
     assert(scan_policy("scanpath=data/games", "", policy, error) && policy.fell_back &&
            policy.ignored.size() == 1 && policy.roots.size() == 34);

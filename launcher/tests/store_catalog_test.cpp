@@ -56,7 +56,7 @@ int main()
           "https://evil/github.com/a", "https://github.com:443/a", "https://github.com/\r\na"})
         assert(!artifact_url(url, true));
     const std::string index =
-        R"({"schema":3,"apps":[{"titleid":"PPSA99400","name":"Prospero BlackBox","kind":"app","status":"coming_soon","content_version":null,"unknown":{"future":true}}]})";
+        R"({"schema":3,"apps":[{"titleid":"PPSA99400","name":"Sahin","kind":"app","status":"coming_soon","content_version":null,"unknown":{"future":true}}]})";
     std::vector<Entry> entries;
     std::string error;
     assert(parse_index(index, entries, error) && entries.size() == 1);

@@ -16,7 +16,7 @@ APP_ROOT_FILES := $(STORE_WORKER) $(SELF_UPDATE_HELPER)
 DEVELOPMENT ?= 0
 # One game's own app (its launcher): GAME=<title ID> with games/<title ID>/sce_sys/param.json
 # (the identity the game runner needs) and games/<title ID>/art (its art's name in the
-# nfs-blackbox-ps5 art folder: <name>.png icon, <name>-bg.png background, <name>.at9 music).
+# repo-root art folder: <name>.png icon, <name>-bg.png background, optional <name>.at9 music).
 GAME ?=
 ifneq ($(GAME),)
 APP_DEFINITIONS += BLACKBOX_GAME=$(GAME)
@@ -103,7 +103,7 @@ test: foundations-check test-store test-self-update
 # imported tidy script passes only src, so lint gets them through CPATH.
 lint: export CPATH := $(abspath src/third_party):$(abspath examples/self-update):$(abspath examples/update-check)
 
-# Home-screen art from the workspace's local art folder (never committed).
+# Home-screen art from the repo-root art folder (generated, see art/make-art.py).
 .PHONY: blackbox-assets
 blackbox-assets:
 	@bash tools/blackbox-assets.sh

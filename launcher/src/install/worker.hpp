@@ -28,7 +28,7 @@ inline constexpr std::size_t kWorkerLine = 2048;
 inline constexpr std::size_t kWorkerPiece = 1u << 20;
 
 // The worker runs with every right, so it only takes paths inside one of the
-// store's own work folders (<drive>/nfs-blackbox/...), written plainly.
+// store's own work folders (<drive>/sahin/...), written plainly.
 bool worker_path(std::string_view path);
 
 // One connection to a worker that has just been started.
@@ -46,7 +46,7 @@ int worker_extract(const Connect &connect, const std::string &archive, std::stri
                    const std::string &destination, const std::atomic<bool> &cancelled,
                    std::atomic<std::uint64_t> &written, std::string &error, ExtractTimes &times);
 int worker_remove(const Connect &connect, const std::string &path);
-// One of the store's own folders, written plainly: a path ending in "/nfs-blackbox".
+// One of the store's own folders, written plainly: a path ending in "/sahin".
 bool worker_folder(std::string_view path);
 // "reclaim" with such a folder: everything in it is given to the worker's user (root)
 // and opened to every user (folders 0777, files 0666), links untouched. A store that

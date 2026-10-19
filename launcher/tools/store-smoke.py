@@ -112,7 +112,7 @@ logger = None
 console = None
 result = {"classification": "no-run", "title": title, "commit": commit}
 remote = "/data/homebrew/" + title
-state_root = "/data/nfs-blackbox"
+state_root = "/data/sahin"
 log_root = state_root + "/logs"
 try:
     if not all(transport.port_open(args.host, port) for port in (2121, 3232, 9021)):

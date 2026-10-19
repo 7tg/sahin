@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Original menu clicks for Prospero BlackBox.
+# Original menu clicks for Sahin.
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Short ticks for the store's buttons (move, confirm, back, and the rest of

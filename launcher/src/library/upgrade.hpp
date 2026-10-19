@@ -9,7 +9,7 @@ namespace store::library
 // An upgrade file (made on a PC by tools/make-upgrade.py from a clean copy of each release)
 // is a zip holding upgrade.json and one ops file per changed file:
 //
-//   upgrade.json  {"schema": 1, "game": "NFSMW", "from": "1.2", "to": "1.3",
+//   upgrade.json  {"schema": 1, "game": "BLUR", "from": "1.0", "to": "1.1",
 //                  "files": [{"path": "GLOBAL/GAMEPLAY.BIN", "from_sha256": "..." (absent
 //                             for a new file), "sha256": "...", "size": 2105216,
 //                             "ops": "ops/0"}],

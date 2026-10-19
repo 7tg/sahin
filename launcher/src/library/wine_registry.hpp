@@ -17,7 +17,7 @@ namespace store::library
 //
 // Keys are written as Windows writes them, one backslash between parts, relative to
 // the file's root (system.reg: HKEY_LOCAL_MACHINE; user.reg: HKEY_CURRENT_USER), e.g.
-// "Software\Wow6432Node\EA Games\Need for Speed Most Wanted". Names and keys match
+// "Software\Wow6432Node\Sahin Games\Blur". Names and keys match
 // without regard to ASCII case, as Windows matches them. The empty name is the key's
 // default value (@).
 class WineRegistry
@@ -67,7 +67,7 @@ bool load_registry(const std::string &path, WineRegistry &registry, std::string 
 // Written beside path, synced, then renamed over it.
 bool save_registry(const std::string &path, const WineRegistry &registry, std::string &error);
 
-// Most Wanted's (and the Widescreen Fix's) packed resolution: 0x80000000 | w << 16 | h.
+// A game's packed resolution: 0x80000000 | w << 16 | h.
 constexpr std::uint32_t packed_resolution(std::uint32_t width, std::uint32_t height)
 {
     return 0x80000000u | (width << 16) | height;

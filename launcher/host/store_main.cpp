@@ -487,27 +487,27 @@ int main(int argc, char **argv)
             };
             if (mode.starts_with("mw-"))
             {
-                // Most Wanted's page in one of its install states: mw-ready, mw-old (a 1.2
-                // base copy), mw-installed, mw-busy (MW's Home app running).
+                // Blur's page in one of its install states: mw-ready, mw-old (a 1.2
+                // base copy), mw-installed, mw-busy (Blur's Home app running).
                 store::library::BaseGame base;
                 base.state = mode == "mw-old"       ? store::library::State::needs_patch
                               : mode == "mw-solo-new" ? store::library::State::absent
                                                       : store::library::State::ready;
                 base.version = mode == "mw-old" ? "1.2" : "1.3";
-                base.path = "/data/nfs-blackbox/base-games/NFSMW";
+                base.path = "/data/sahin/base-games/BLUR";
                 if (mode == "mw-solo-usb") // the copy on a USB drive: Install copies it first
                 {
                     base.on_usb = true;
-                    base.path = "/mnt/usb1/NFSMW";
+                    base.path = "/mnt/usb1/BLUR";
                 }
                 base.detail = mode == "mw-old" ? "Version 1.2: upgraded to 1.3 as it installs."
                                                : "Version " + base.version + ".";
                 screen.set_installer(true, true, "", "/data/homebrew");
-                screen.set_running(mode == "mw-busy" ? std::vector<std::string>{"PPSA99403"}
+                screen.set_running(mode == "mw-busy" ? std::vector<std::string>{"PPSA99404"}
                                                      : std::vector<std::string>{},
                                    true);
                 // The plan's option, as the Service publishes it.
-                screen.set_base("PPSA99403", base,
+                screen.set_base("PPSA99404", base,
                                 mode == "mw-installed" || mode.starts_with("mw-solo-installed"),
                                 {{"x360", "Xbox 360 graphics",
                                   "The Xbox 360 look: the X360 Stuff Pack 4.2, the converted Xbox 360 "
@@ -517,9 +517,9 @@ int main(int argc, char **argv)
                 if (mode.starts_with("mw-solo"))
                 {
                     // The game's own app: its page only (installed, the player quit to it).
-                    screen.set_single_game("PPSA99403");
+                    screen.set_single_game("PPSA99404");
                 }
-                assert(screen.open_app("PPSA99403"));
+                assert(screen.open_app("PPSA99404"));
                 settle(90);
                 if (mode == "mw-ask")
                 {
@@ -556,7 +556,7 @@ int main(int argc, char **argv)
                 else if (mode == "mw-installing" || mode == "mw-solo-installing")
                 {
                     // Downloading, the first stage, the box grown.
-                    screen.set_activity({"PPSA99403", 1, 640u << 20, 1495u << 20, {}, 1,
+                    screen.set_activity({"PPSA99404", 1, 640u << 20, 1495u << 20, {}, 1,
                                          {"Copied to the console; the USB drive can go",
                                           "Getting Xbox 360 Stuff Pack 4.2 (9 of 14)"}, 0.31f});
                     settle(60);
@@ -564,7 +564,7 @@ int main(int argc, char **argv)
                 else if (mode == "mw-installing-files")
                 {
                     // Further on: the game's files, the stages before it done.
-                    screen.set_activity({"PPSA99403", 6, 1200u << 20, 3000u << 20, {}, 4,
+                    screen.set_activity({"PPSA99404", 6, 1200u << 20, 3000u << 20, {}, 4,
                                          {"On the console", "All 17 files ready", "Using the prefix pb-mw",
                                           "Your copy and the mod files check out",
                                           "Copying your game into the prefix"}, 0.72f});
@@ -698,7 +698,7 @@ int main(int argc, char **argv)
             else if (mode == "news")
             {
                 screen.set_news(
-                    {{"2026-10-11-store-060", "2026-10-11T09:00:00Z", "Prospero BlackBox 1.000.060",
+                    {{"2026-10-11-store-060", "2026-10-11T09:00:00Z", "Sahin 1.000.060",
                       "Developer pages, a News room and a shelf for apps new to the catalog.\n\n"
                       "Open an app and press R3 to see everything else its developer made."},
                      {"2026-10-08-mirror", "2026-10-08T18:00:00Z", "The catalog has a mirror",
@@ -784,7 +784,7 @@ int main(int argc, char **argv)
             }
             else if (mode == "notice")
                 screen.notify("Update available: 01.000.010",
-                              "A newer Prospero BlackBox is available.");
+                              "A newer Sahin is available.");
             else if (mode == "scrolled" || mode == "coming-soon")
             {
                 hui::InputFrame move;
@@ -810,13 +810,13 @@ int main(int argc, char **argv)
                     {"PPSA99001", "ProsperoRadio", "01.000.000", "/data/homebrew/PPSA99001", "",
                      false, true, false},
                     {"PPSA99002", "ProsperoLight", "01.000.000", "/data/homebrew/PPSA99002",
-                     "Installed outside Prospero BlackBox. Not managed by this app.", false, false,
+                     "Installed outside Sahin. Not managed by this app.", false, false,
                      false},
                     {"PPSA99980", "Example local app", "01.000.001", "/mnt/ext1/homebrew/PPSA99980",
-                     "Installed outside Prospero BlackBox. Not managed by this app.", false, false,
+                     "Installed outside Sahin. Not managed by this app.", false, false,
                      false},
                     {"", "Example.ffpkg", "", "/mnt/ext1/homebrew/Example.ffpkg",
-                     "Image installed outside Prospero BlackBox. Not managed by this app.", true, false,
+                     "Image installed outside Sahin. Not managed by this app.", true, false,
                      false}};
                 screen.set_inventory(std::move(inventory));
                 screen.set_status("Installed library preview");
@@ -846,7 +846,7 @@ int main(int argc, char **argv)
                     store::system::Inventory inventory;
                     inventory.apps = {{"PPSA99001", "ProsperoRadio", "01.000.005",
                                        "/data/homebrew/PPSA99001",
-                                       "Installed outside Prospero BlackBox. Not managed by this app.",
+                                       "Installed outside Sahin. Not managed by this app.",
                                        false, false, false}};
                     screen.set_inventory(std::move(inventory));
                 }

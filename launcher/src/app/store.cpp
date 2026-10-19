@@ -421,7 +421,7 @@ void Screen::rebuild()
         // The whole collection in release order, the games still in progress greyed.
         shelf("The collection", [](const App &) { return true; }, 3);
         shelf("On this console", [](const App &a) { return !a.installed.empty(); }, 0);
-        // A fresh page opens on its first shelf's resting place (Most Wanted, not a greyed game).
+        // A fresh page opens on its first shelf's resting place (Blur, not a greyed game).
         if (previous.empty() && !shelves_.empty() && focus_ == 0)
             focus_ = shelves_.front().start + shelves_.front().pos;
     }
@@ -667,12 +667,13 @@ void Screen::refresh_detail()
         else
         {
             blocks.push_back(Block::paragraph(
-                "1. Install the PC game on a computer: 1.2 (the disc) or 1.3. Leave it unmodded."));
+                "1. Install Blur, the PC game, on a computer. Leave it unmodded."));
             blocks.push_back(Block::paragraph(
-                "2. Copy the whole game folder, the one with speed.exe, to the PS5: over FTP to " +
+                "2. Copy the whole game folder, the one with Blur.exe, to the PS5: over FTP to " +
                 (base.state == State::absent ? base.path
-                                             : "/data/nfs-blackbox/base-games/" + folder) +
-                ", or to a USB drive as a folder named " + folder + " at its top."));
+                                             : "/data/sahin/base-games/" + folder) +
+                ", or to a USB drive as a folder named " + folder +
+                " (Blur works too) at its top."));
             blocks.push_back(Block::paragraph(
                 "3. This page notices the copy by itself. Then press Install."));
             if (base.state != State::absent)
@@ -1261,7 +1262,7 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
             ask_ = Ask::adopt;
             ask_id_ = shown.title_id;
             dialog_.open({ui::StatusKind::question,
-                          "Manage " + shown.name + " with Prospero BlackBox?",
+                          "Manage " + shown.name + " with Sahin?",
                           "Nothing is changed now. From then on its updates are offered here. An "
                           "update replaces the app's whole folder; the previous one, with "
                           "anything you added inside it, is kept in the store's \"previous\" "
@@ -1281,7 +1282,7 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
         }
         else if (state.primary == Order::Kind::install_game && !shown.game_options.empty())
         {
-            // The plan's option (MW: the Xbox 360 look), asked each time; the focus opens
+            // The plan's option (the game's options), asked each time; the focus opens
             // on what the last install chose, or the plan's default.
             const auto &option = shown.game_options.front();
             ask_ = Ask::game_options;
@@ -2193,7 +2194,7 @@ void Screen::draw_grid(const ui::Fonts &fonts)
             : library && !inventory_.complete
                 ? "Installed apps are unavailable until their locations can be read."
             : !query_.empty() ? "Try another app name or developer."
-            : section_ == kUpdates ? "Updates for games installed by Prospero BlackBox appear here."
+            : section_ == kUpdates ? "Updates for games installed by Sahin appear here."
             : apps_.empty()   ? "Verified apps will appear here when the catalog is ready."
                               : "Try another section.";
         // While something is on its way an arc draws itself into a full
@@ -2511,13 +2512,13 @@ Screen::Offer Screen::offer(const App &app) const
         const bool newer = catalog::update_available(self_version_, app.available_version);
         out.headline = restart_needed_ ? "Restart to finish"
                        : newer         ? "Update"
-                                       : "This is Prospero BlackBox";
+                                       : "This is Sahin";
         out.note = newer && !restart_needed_
                        ? self_version_ + "  \xE2\x86\x92  " + app.available_version
                        : "Version " + self_version_;
         out.tone = newer || restart_needed_ ? 1 : 0;
         out.reason = restart_needed_
-                         ? "Close Prospero BlackBox and open it again to use the new version."
+                         ? "Close Sahin and open it again to use the new version."
                      : newer ? ""
                              : "You are using it right now.";
         if (newer && !restart_needed_)
@@ -2532,7 +2533,7 @@ Screen::Offer Screen::offer(const App &app) const
             {
                 out.armed = true;
                 out.reason = "The new version is put in place now and starts the next time "
-                             "Prospero BlackBox is opened.";
+                             "Sahin is opened.";
             }
         }
         return out;
@@ -2562,10 +2563,10 @@ Screen::Offer Screen::offer(const App &app) const
                  installed->path.ends_with("/" + app.title_id))
         {
             // Installed by hand, and listed in the catalog: it can be handed over.
-            out.label = "Manage with Prospero BlackBox";
+            out.label = "Manage with Sahin";
             out.primary = Order::Kind::adopt;
             out.armed = installer_;
-            out.reason = installer_ ? "Installed outside Prospero BlackBox. Hand it over to get its "
+            out.reason = installer_ ? "Installed outside Sahin. Hand it over to get its "
                                       "updates here."
                                     : installer_reason_;
             return out;
@@ -2584,7 +2585,7 @@ Screen::Offer Screen::offer(const App &app) const
         // console first (base-games, kept for repairs).
         if (usable)
         {
-            // The games' own Home apps (PPSA99401-99406, ours) share the prefix: a game writes
+            // The games' own Home apps (PPSA99404, ours) share the prefix: a game writes
             // its registry back when it exits, so nothing changes while one runs. Apps this
             // manager didn't install are none of its business.
             const auto blocking =
@@ -2642,7 +2643,7 @@ Screen::Offer Screen::offer(const App &app) const
                 out.note = "Follow the steps on the left";
             }
             out.reason = base.state == State::absent
-                             ? "A clean install of the PC game, 1.2 or 1.3. Mods are added for you."
+                             ? "Your own copy of Blur, unmodded. Sahin adds what it needs."
                              : base.path;
         }
         return out;
@@ -2657,7 +2658,7 @@ Screen::Offer Screen::offer(const App &app) const
     {
         out.headline = "Not installable";
         out.note = "Published as a disk image";
-        out.reason = "Can't be installed by this version of Prospero BlackBox";
+        out.reason = "Can't be installed by this version of Sahin";
     }
     else if (!app.local_only)
     {
@@ -2880,7 +2881,7 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
             where = app.installed.front().path;
         if (state.primary == Order::Kind::install_game || state.primary == Order::Kind::play)
             where = std::string(app.game_installed ? "In" : "Installs into") + " the Wine prefix " +
-                    (settings_.game_prefix.empty() ? "nfs-blackbox" : settings_.game_prefix);
+                    (settings_.game_prefix.empty() ? "sahin" : settings_.game_prefix);
         if (state.primary != Order::Kind::none)
             ui::text(list, fonts.regular, fonts.regular.font->fit(where, 18, w), cx, box.y + 396.0f,
                      18, kInk.with_alpha(0.46f), gfx::Align::center);
@@ -3350,7 +3351,7 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
         detail[details++] = {ui::Button::triangle, "Game settings"};
     else if (single_game_.empty() && focused() && !focused()->local_only)
         detail[details++] = {ui::Button::triangle, "Refresh"};
-    // The collection is EA Black Box: nothing more of theirs is listed here.
+    // The collection is Sahin's own: no other developer is listed here.
     if (focused() && !focused()->local_only && !focused()->author.empty() &&
         !catalog::blackbox_game(focused()->title_id))
         detail[details++] = {ui::Button::right_stick, "More by this developer"};
@@ -3381,7 +3382,7 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
         // The bar that fills while Circle is held; full, the store closes.
         const float filled = tween::clamp01((close_hold_ - kCloseDelay) / kCloseHold);
         const float shown = tween::clamp01((close_hold_ - kCloseDelay) / 0.12f);
-        const char *words = "Keep holding to close Prospero BlackBox";
+        const char *words = "Keep holding to close Sahin";
         const float width = fonts.semibold.measure(words, 24) + 132.0f;
         const Rect pill{(kWidth - width) * 0.5f, 842.0f, width, 76.0f};
         overlay_.push_opacity(shown);
@@ -3651,7 +3652,7 @@ void Screen::write_about()
         for (const auto &line : debug_lines_)
             blocks.push_back(Block::bullet(line));
     }
-    blocks.push_back(Block::paragraph("Prospero BlackBox installs, updates and uninstalls apps from "
+    blocks.push_back(Block::paragraph("Sahin installs, updates and uninstalls apps from "
                                       "your selected homebrew catalog."));
     blocks.push_back(
         Block::key_value("Version", self_version_.empty() ? "Unknown" : self_version_));
@@ -3670,11 +3671,11 @@ void Screen::write_about()
     blocks.push_back(Block::heading("Please note", 3));
     blocks.push_back(Block::paragraph(
         "Apps are published by their own developers, who are responsible for their content "
-        "and licensing. A listing is not a security audit. Prospero BlackBox and the catalog come "
+        "and licensing. A listing is not a security audit. Sahin and the catalog come "
         "without warranty."));
     blocks.push_back(Block::heading("Where things are", 3));
-    blocks.push_back(Block::key_value("Store files", "/data/nfs-blackbox"));
-    blocks.push_back(Block::key_value("Logs", "/data/nfs-blackbox/logs"));
+    blocks.push_back(Block::key_value("Store files", "/data/sahin"));
+    blocks.push_back(Block::key_value("Logs", "/data/sahin/logs"));
     blocks.push_back(Block::heading("Thanks", 3));
     blocks.push_back(Block::paragraph(
         "ShadowMountPlus by drakmor puts installed apps on the home screen. Built with "
@@ -3821,7 +3822,7 @@ void Screen::update_panel(const InputFrame &input, ui::Feedback &feedback)
             return refuse(feedback, input.nav_repeat, 0.0f, 0.0f);
         }
         settings_.use_official = !settings_.use_official;
-        notify("Catalog settings saved", "Close and reopen Prospero BlackBox to apply.");
+        notify("Catalog settings saved", "Close and reopen Sahin to apply.");
     }
     else if (setting == 6)
     {
@@ -3831,8 +3832,8 @@ void Screen::update_panel(const InputFrame &input, ui::Feedback &feedback)
         if (!settings_.custom_active())
             settings_.use_official = true;
         notify("Catalog settings saved", settings_.use_custom
-                                             ? "Close and reopen Prospero BlackBox to add your catalog."
-                                             : "Close and reopen Prospero BlackBox to apply.");
+                                             ? "Close and reopen Sahin to add your catalog."
+                                             : "Close and reopen Sahin to apply.");
     }
     else if (setting == 7)
     {
@@ -3868,7 +3869,7 @@ void Screen::update_panel(const InputFrame &input, ui::Feedback &feedback)
         settings_.use_official = true;
         settings_.use_custom = false;
         settings_.catalog_url = catalog::kDefaultApi;
-        notify("Official catalog restored", "Close and reopen Prospero BlackBox to apply.");
+        notify("Official catalog restored", "Close and reopen Sahin to apply.");
     }
     else
     {
@@ -4167,7 +4168,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         } rows[] = {
             {3, "Install location", "Where new apps go: a folder ShadowMountPlus scans.", 0, place,
              true},
-            {4, "Check for a newer Prospero BlackBox", "Asked once at start; a notice appears.", 1, "",
+            {4, "Check for a newer Sahin", "Asked once at start; a notice appears.", 1, "",
              settings_.check_updates},
             {5, "Sounds", "The interface's own sounds.", 1, "", settings_.sounds},
             {6, "Vibration", "A light answer from the controller.", 1, "", settings_.vibration},
@@ -4186,7 +4187,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
              settings_.verify_signatures},
             {4, "Restore official catalog",
              "Only homebrew.page, with signature checks, next launch.", 2, "Restore", false},
-            {7, "Prospero BlackBox", "Its page updates it.", 2,
+            {7, "Sahin", "Its page updates it.", 2,
              restart_needed_ ? "Restart to finish"
              : newer         ? "Version " + self->available_version + " available"
                              : "Version " + self_version_ + (self ? ", up to date" : ""),
@@ -4290,7 +4291,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         if (logo_)
             list.image(logo_, {cx - 48.0f, cy - 48.0f, 96.0f, 96.0f}, {0, 0, 1, 1}, kWhite,
                        logo_cutout_ ? 0.0f : 20.0f);
-        ui::text(list, fonts.display, "Prospero BlackBox", px + 150.0f, panel.y + 98.0f, 52, kInk);
+        ui::text(list, fonts.display, "Sahin", px + 150.0f, panel.y + 98.0f, 52, kInk);
         ui::text(list, fonts.regular, "The Black Box Need for Speed games, as native PS5 titles",
                  px + 152.0f, panel.y + 136.0f, 22, kInk.with_alpha(0.62f));
         const float words = ui::text(list, fonts.regular, "Based on ProsperoStore by ", px + 152.0f,

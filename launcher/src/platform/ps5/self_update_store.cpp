@@ -56,7 +56,7 @@ int download(void *user, const char *url, std::uint64_t limit, self_update_sink 
     // store is published while it is being tested (development builds only).
     if (address.ends_with("/dev/PPSA99400.zip"))
     {
-        const int file = open("/data/nfs-blackbox/dev/self.zip", O_RDONLY);
+        const int file = open("/data/sahin/dev/self.zip", O_RDONLY);
         if (file < 0)
             return -1;
         std::vector<char> piece(256 * 1024);

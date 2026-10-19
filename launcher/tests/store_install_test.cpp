@@ -841,22 +841,22 @@ struct WorkerHost
 void check_worker(const fs::path &base, const std::string &program)
 {
     using install::worker_path;
-    assert(worker_path("/data/nfs-blackbox/staging/PPSA99500"));
-    assert(worker_path("/mnt/usb0/nfs-blackbox/trash/PPSA99500"));
-    assert(!worker_path("/data/nfs-blackbox"));          // The work folder itself.
+    assert(worker_path("/data/sahin/staging/PPSA99500"));
+    assert(worker_path("/mnt/usb0/sahin/trash/PPSA99500"));
+    assert(!worker_path("/data/sahin"));          // The work folder itself.
     assert(!worker_path("/data/homebrew/PPSA99500"));     // An installed app.
-    assert(!worker_path("data/nfs-blackbox/staging/x")); // Not absolute.
-    assert(!worker_path("/data/nfs-blackbox/../etc"));
-    assert(!worker_path("/data/nfs-blackbox/./x"));
-    assert(!worker_path("/data/nfs-blackbox//x"));
-    assert(!worker_path("/data/nfs-blackbox/x/"));
-    assert(!worker_path("/data/nfs-blackbox/a\nb"));
-    assert(!worker_path("/data/mynfs-blackbox/x"));
+    assert(!worker_path("data/sahin/staging/x")); // Not absolute.
+    assert(!worker_path("/data/sahin/../etc"));
+    assert(!worker_path("/data/sahin/./x"));
+    assert(!worker_path("/data/sahin//x"));
+    assert(!worker_path("/data/sahin/x/"));
+    assert(!worker_path("/data/sahin/a\nb"));
+    assert(!worker_path("/data/mysahin/x"));
     assert(!worker_path(""));
 
     const auto v1 = expected_tree(app("01.000.001")), v2 = expected_tree(app("01.000.002"));
     Fixture f(base, "worker");
-    f.work = f.root / "nfs-blackbox";
+    f.work = f.root / "sahin";
     f.environment.work = f.work.string();
     WorkerHost host;
     host.program = program;

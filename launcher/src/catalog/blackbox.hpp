@@ -20,7 +20,7 @@ struct Palette
 
 struct Game
 {
-    const char *id;          // its own Home-screen title, PPSA9940N
+    const char *id;          // its own Home-screen title, PPSA99404
     const char *folder;      // base-games/<folder> and the USB folder name
     const char *name;
     const char *released;    // ISO date, for sorting
@@ -32,7 +32,7 @@ struct Game
 
 std::span<const Game> blackbox_games();
 
-// One of the six built-in games (PPSA99401–99406), whether or not its base copy
+// The built-in game (PPSA99404), whether or not its base copy
 // has been looked up yet.
 inline bool blackbox_game(std::string_view id)
 {

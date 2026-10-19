@@ -16,8 +16,8 @@ struct GameProfile
     // [application]
     std::string id;                // [a-z0-9][a-z0-9_-]*: also names the file
     std::string name;              // shown in the launcher
-    std::string executable;        // C:\Games\NFSMW\speed.exe
-    std::string working_directory; // C:\Games\NFSMW
+    std::string executable;        // C:\Games\BLUR\Blur.exe
+    std::string working_directory; // C:\Games\BLUR
     std::string dll_overrides;     // WINEDLLOVERRIDES syntax; empty for none
     std::string prefix;            // the prefix's folder under /data/prospero-win/prefixes
     std::string runtime = "wine-wow64";

@@ -167,16 +167,15 @@ int main()
     const std::string root = std::filesystem::canonical(path).string(); // macOS's /tmp is a symlink
     store::Service service(root, "01.000.000");
     assert(service.start());
-    // The collection is built in: six games, Most Wanted the only one to install.
+    // The collection is built in: one game, Blur, which installs.
     const auto listed = next(service, store::Update::Kind::catalog);
     const auto &games = listed.snapshot.entries;
-    assert(games.size() == 6 && !listed.snapshot.online && listed.snapshot.accepted);
+    assert(games.size() == 1 && !listed.snapshot.online && listed.snapshot.accepted);
     for (const auto &game : games)
-        assert(game.status == (game.id == "PPSA99403" ? "available" : "coming_soon") &&
-               game.icon.ends_with(".png"));
-    assert(service.request_detail("PPSA99403"));
+        assert(game.status == "available" && game.icon.ends_with(".png"));
+    assert(service.request_detail("PPSA99404"));
     const auto page = next(service, store::Update::Kind::detail);
-    assert(page.entry.id == "PPSA99403" && page.entry.name == "Most Wanted");
+    assert(page.entry.id == "PPSA99404" && page.entry.name == "Blur");
     assert(service.request_detail("PPSA99001"));
     const auto unknown = next(service, store::Update::Kind::error);
     assert(unknown.entry.id == "PPSA99001" && !unknown.message.empty());

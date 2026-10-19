@@ -75,17 +75,17 @@ int main()
     // A pinned source (checked by its hash after): any https host, redirects too, never
     // plain http, a hostless or spaced address.
     responses = {reply(302, "https://cdn.example.org/files/mod.zip"), reply(200)};
-    assert(fetch("https://nfsmods.example/uploads/mod.zip", Purpose::source, 100, body, control).ok() &&
+    assert(fetch("https://mods.example/uploads/mod.zip", Purpose::source, 100, body, control).ok() &&
            calls.size() == 2 && calls.back() == "https://cdn.example.org/files/mod.zip");
     calls.clear();
     responses = {reply(302, "http://cdn.example.org/mod.zip")};
-    assert(!fetch("https://nfsmods.example/mod.zip", Purpose::source, 100, body, control).ok() &&
+    assert(!fetch("https://mods.example/mod.zip", Purpose::source, 100, body, control).ok() &&
            calls.size() == 1);
     calls.clear();
-    for (const char *bad : {"http://nfsmods.example/mod.zip", "https:///mod.zip", "https://a b/mod.zip"})
+    for (const char *bad : {"http://mods.example/mod.zip", "https:///mod.zip", "https://a b/mod.zip"})
         assert(!fetch(bad, Purpose::source, 100, body, control).ok() && calls.empty());
     // The same address is no app download: artifacts keep their allow-list.
-    assert(!fetch("https://nfsmods.example/uploads/mod.zip", Purpose::artifact, 100, body, control).ok() &&
+    assert(!fetch("https://mods.example/uploads/mod.zip", Purpose::artifact, 100, body, control).ok() &&
            calls.empty());
     control.cancelled.store(true);
     assert(!fetch(url, Purpose::artifact, 100, body, control).ok() && calls.empty());

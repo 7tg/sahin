@@ -72,7 +72,7 @@ class Timer
 };
 
 // The Home app the manager carries for a game: <bundle>/apps.json names its archive, size,
-// SHA-256 and version (nfs-blackbox-ps5's tools/make-bundle.py writes it).
+// SHA-256 and version (the Sahin repo's tools/make-bundle.py writes it).
 bool carried_app(const std::string &bundle, const catalog::Entry &game, catalog::Entry &app,
                  std::string &archive)
 {
@@ -251,7 +251,7 @@ bool Service::load_policy(system::ScanPolicy &out, std::vector<std::string> *not
         out = installer_environment->policy;
         return true;
     }
-    if (root_ != "/data/nfs-blackbox")
+    if (root_ != "/data/sahin")
         return false;
     std::string configuration, manual, policy_error;
     const bool configured =
@@ -662,7 +662,7 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
     const auto prefix = chosen_plan.prefix;
     struct stat bare{};
     if (!library::prefix_ready(win_root, prefix) &&
-        stat((bundle + "/bare-prefix-nfs-blackbox.zip").c_str(), &bare) == 0)
+        stat((bundle + "/bare-prefix-sahin.zip").c_str(), &bare) == 0)
         weight[prefix_part] = static_cast<double>(bare.st_size);
     overall(prefix_part, 0.0);
     if (library::prefix_ready(win_root, prefix))
@@ -672,7 +672,7 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
         stage(2, "Making the prefix " + prefix);
         progress_.phase = static_cast<int>(install::Phase::unpacking);
         if (!library::ensure_prefix(
-                win_root, prefix, bundle + "/bare-prefix-nfs-blackbox.zip",
+                win_root, prefix, bundle + "/bare-prefix-sahin.zip",
                 [&](std::uint64_t done, std::uint64_t total)
                 {
                     progress_.total = total;
@@ -993,7 +993,7 @@ void Service::run_installer()
             {
                 // In pieces, as a download arrives: never the whole archive in memory.
                 net::Response response;
-                const int file = open("/data/nfs-blackbox/dev/self.zip", O_RDONLY);
+                const int file = open("/data/sahin/dev/self.zip", O_RDONLY);
                 std::vector<char> piece(256 * 1024);
                 std::uint64_t total = 0;
                 bool ok = file >= 0;
@@ -1086,22 +1086,22 @@ void Service::run_installer()
         else if (recovered.restart)
         {
             // The console started the old store once more after its update.
-            broken = "Prospero BlackBox is finishing its own update. Close it and open it again.";
+            broken = "Sahin is finishing its own update. Close it and open it again.";
             Update notice;
             notice.kind = Update::Kind::job;
             notice.entry.id = environment.self;
             notice.ok = true;
             notice.restart = true;
-            notice.message = "Prospero BlackBox was updated";
+            notice.message = "Sahin was updated";
             notice.detail = "The console is still running the previous version. Close "
-                            "Prospero BlackBox, restart the console and open it again.";
+                            "Sahin, restart the console and open it again.";
             publish(std::move(notice));
         }
         else if (!recovered.operation.empty())
         {
             Update notice;
             notice.kind = Update::Kind::notice;
-            notice.message = kOwnGame ? "Recovered" : "Prospero BlackBox recovered";
+            notice.message = kOwnGame ? "Recovered" : "Sahin recovered";
             notice.detail = "An interrupted " + recovered.operation + " was cleaned up.";
             publish(std::move(notice));
             rescan();
@@ -1224,7 +1224,7 @@ void Service::run_installer()
         if (result.ok && result.operation == "self-update")
         {
             done.close = true;
-            done.message = "Updating Prospero BlackBox";
+            done.message = "Updating Sahin";
             done.detail = "It closes now. A notification says when the new version is in "
                           "place; then open it again.";
         }
@@ -1239,7 +1239,7 @@ void Service::run_installer()
                                    : result.operation == "update"  ? " updated"
                                                                    : " installed");
             done.detail =
-                result.restart ? "Close Prospero BlackBox and open it again to finish. If the "
+                result.restart ? "Close Sahin and open it again to finish. If the "
                                  "old version opens, restart the console first."
                 : result.operation == "uninstall"
                     ? (unregistered == 0 ? "It is off the home screen. Its saved data stays."
@@ -1254,7 +1254,7 @@ void Service::run_installer()
                 : result.operation == "game-uninstall"
                     ? (kOwnGame ? "Your saves and your copy of the game stay. Install puts it back."
                                 : "Its saves stay in the prefix, and so does the base copy.")
-                : result.operation == "adopt" ? "Prospero BlackBox will offer its updates from now on."
+                : result.operation == "adopt" ? "Sahin will offer its updates from now on."
                 : result.operation == "update"
                     ? "The new version is in place. Give the console a few minutes "
                       "before starting it."
@@ -1310,7 +1310,7 @@ void Service::run()
             continue;
         const auto probe = system::probe_storage(path);
         const bool work_safe =
-            system::work_path_unscanned(scan_policy, drive + "/nfs-blackbox/staging/PPSA99400");
+            system::work_path_unscanned(scan_policy, drive + "/sahin/staging/PPSA99400");
         hui::sys::log(
             "[STORE] storage path=%s fs=%s available=%llu rename=%d work-safe=%d error=%s",
             path.c_str(), probe.filesystem.c_str(),
