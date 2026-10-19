@@ -121,7 +121,7 @@ std::string format_settings(const Settings &settings);
 Settings parse_settings(std::string_view text);
 
 // What the installer is doing right now, as the page shows it.
-// What the game's Black Box menu left for the next start (<data>/ingame-<title>.txt): the
+// What the game's in-game menu left for the next start (<data>/ingame-<title>.txt): the
 // launcher applies it, then plays unless the player asked for the setup screen.
 struct InGame
 {

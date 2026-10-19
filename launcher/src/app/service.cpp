@@ -1318,13 +1318,13 @@ void Service::run()
             probe.error.c_str());
     }
 #endif
-    // The catalog is built in: the Black Box games, nothing downloaded or verified.
+    // The catalog is built in: Blur, nothing downloaded or verified.
     if (!control_.cancelled.load())
     {
         Update result;
         result.kind = Update::Kind::catalog;
         result.snapshot = catalog::blackbox_snapshot(system::app_folder());
-        result.message = "Black Box collection";
+        result.message = "Sahin";
         hui::sys::log("[STORE] catalog built-in games=%zu", result.snapshot.entries.size());
         publish(std::move(result));
     }

@@ -1751,7 +1751,7 @@ void Screen::draw_top_bar(const ui::Fonts &fonts)
     if (logo_ && !intro_showing())
         list.image(logo_, {kMargin - 8.0f, kTopY - 21.0f, 42.0f, 42.0f}, {0, 0, 1, 1}, kWhite,
                    logo_cutout_ ? 0.0f : 7.0f);
-    ui::text(list, fonts.semibold, "PROSPERO BLACKBOX", kMargin + 42.0f,
+    ui::text(list, fonts.semibold, "SAHIN", kMargin + 42.0f,
                                  centred(kTopY, 22), 22, kInk, gfx::Align::left, 5.0f);
 
     // The sections: words, the active one lit, one gold line gliding under it.
@@ -1862,7 +1862,7 @@ void Screen::draw_stage(const ui::Fonts &fonts)
             app.badge == "Update"                ? "UPDATE AVAILABLE"
             : app.badge == "Installed"           ? "ON THIS CONSOLE"
             : app.catalog_badge == "Coming soon" ? "IN PROGRESS"
-                                                 : "NEED FOR SPEED";
+                                                 : "BLUR";
         list.push_opacity(alpha);
         list.push_transform(1.0f, 0, 0, dx, 0);
         list.rounded_rect({kMargin, kStageKickerY - 9.0f, 28.0f, 3.0f}, 1.5f, kAccent);
@@ -3255,11 +3255,11 @@ void Screen::draw_intro(const ui::Fonts &fonts)
     list.push_opacity(1.0f - tween::smoothstep(intro_leave_ * 2.0f));
     const float name = still ? 1.0f : tween::cubic_out(tween::clamp01((t - 0.45f) / 0.7f));
     if (name > 0.0f)
-        ui::text(list, fonts.semibold, "PROSPERO BLACKBOX", cx, centred(660.0f, 40), 40,
+        ui::text(list, fonts.semibold, "SAHIN", cx, centred(660.0f, 40), 40,
                  kInk.with_alpha(name), gfx::Align::center, tween::lerp(26.0f, 11.0f, name));
     const float source = still ? 1.0f : tween::smoothstep((t - 0.8f) / 0.5f);
     if (source > 0.0f)
-        ui::text(list, fonts.semibold, "NEED FOR SPEED  \xC2\xB7  BLACK BOX COLLECTION", cx,
+        ui::text(list, fonts.semibold, "BLUR  \xC2\xB7  FOR PS5", cx,
                  centred(716.0f, 24), 24,
                  gold.with_alpha(0.92f * source), gfx::Align::center, 2.0f);
     // A longer wait says what it is waiting for, with a line of light running along a track.
@@ -3981,7 +3981,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
 
     // The left: whose room this is, the room's name, and the four rooms.
     constexpr const char *kTabs[] = {"Downloads", "Settings", "About"};
-    ui::text(list, fonts.semibold, "PROSPERO BLACKBOX", kMargin, 170.0f, 18, kAccent, gfx::Align::left,
+    ui::text(list, fonts.semibold, "SAHIN", kMargin, 170.0f, 18, kAccent, gfx::Align::left,
              4.0f);
     ui::text(list, fonts.display, kTabs[panel_tab_], kMargin - 3.0f, 248.0f, 64, kInk);
     for (int i = 0; i < 3; ++i)
@@ -4292,7 +4292,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
             list.image(logo_, {cx - 48.0f, cy - 48.0f, 96.0f, 96.0f}, {0, 0, 1, 1}, kWhite,
                        logo_cutout_ ? 0.0f : 20.0f);
         ui::text(list, fonts.display, "Sahin", px + 150.0f, panel.y + 98.0f, 52, kInk);
-        ui::text(list, fonts.regular, "The Black Box Need for Speed games, as native PS5 titles",
+        ui::text(list, fonts.regular, "Blur on the PS5, from your own copy",
                  px + 152.0f, panel.y + 136.0f, 22, kInk.with_alpha(0.62f));
         const float words = ui::text(list, fonts.regular, "Based on ProsperoStore by ", px + 152.0f,
                                      panel.y + 168.0f, 22, kInk.with_alpha(0.62f));

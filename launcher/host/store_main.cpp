@@ -431,7 +431,7 @@ int main(int argc, char **argv)
                 apps.back().size = entry.size;
                 apps.back().added = entry.added;
             }
-            screen.set_catalog(std::move(apps), "Black Box collection");
+            screen.set_catalog(std::move(apps), "Sahin");
             const auto picture = [&](const std::string &path, hui::Image &image)
             {
                 std::string encoded;

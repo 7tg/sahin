@@ -35,7 +35,7 @@ int main()
 
     // Blur's own manifest: mods are left out, an unknown copy is a warning.
     const Manifest *blur = manifest_for("BLUR");
-    assert(blur && blur->mods_left_out && blur->accept_unknown && manifest_for("NFSMW") == nullptr);
+    assert(blur && blur->mods_left_out && blur->accept_unknown && manifest_for("OTHER") == nullptr);
 
     // A small game of the same shape, its releases told by data.bin.
     const std::string current(3000, 'c'), older(2000, 'o');

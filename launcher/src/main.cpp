@@ -88,7 +88,7 @@ bool single_game_installed(const std::string &app_root, const std::string &stora
     return false;
 }
 
-// What the game's Black Box menu left for this start: <data>/ingame-<title>.txt, taken (renamed
+// What the game's in-game menu left for this start: <data>/ingame-<title>.txt, taken (renamed
 // to .last) so that it is applied once.
 std::optional<store::InGame> take_ingame_choices(const std::string &storage_root)
 {
@@ -235,7 +235,7 @@ int main()
     const std::string app_root = store::system::app_folder();
     sys::log("[STORE] app folder=%s", app_root.c_str());
     // A game's own app shows its screen only when the game isn't installed yet, or when the
-    // game's Black Box menu left choices to apply (or asked for this screen); otherwise the
+    // game's in-game menu left choices to apply (or asked for this screen); otherwise the
     // tile goes straight into the game.
     const auto ingame = kSingleGame[0] && elevated ? take_ingame_choices(storage_root) : std::nullopt;
     if (kSingleGame[0] && elevated && !ingame && single_game_installed(app_root, storage_root))
