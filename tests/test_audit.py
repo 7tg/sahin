@@ -32,3 +32,39 @@ def test_allowlist_ignores_blank_and_comment_lines(tmp_path):
     (tmp_path / ".audit-allow").write_text("#note\n\nwine.dll\n   \n")
     r = run(tmp_path)
     assert "wine.dll" not in r.stdout and "#note" in r.stdout
+
+def make_zip(path, members):
+    import zipfile
+    with zipfile.ZipFile(path, "w") as z:
+        for name, data in members.items():
+            z.writestr(name, data)
+
+def test_zip_with_pe_member_fails(tmp_path):
+    make_zip(tmp_path / "b.zip", {"ok.txt": b"hi", "dir/tool.dll": b"MZ" + b"\0" * 62})
+    r = run(tmp_path)
+    assert r.returncode == 1 and "b.zip!dir/tool.dll" in r.stdout and "ok.txt" not in r.stdout
+
+def test_zip_allowed_member_passes(tmp_path):
+    (tmp_path / "sub").mkdir()
+    make_zip(tmp_path / "sub/b.zip", {"win/system32/wine.dll": b"MZ" + b"\0" * 62,
+                                      "win/system32/drivers/x.sys": b"MZ" + b"\0" * 62})
+    (tmp_path / ".audit-allow").write_text("sub/*.zip!win/system32/*\n")
+    assert run(tmp_path).returncode == 0
+
+def test_zip_allow_glob_does_not_cover_other_members(tmp_path):
+    make_zip(tmp_path / "b.zip", {"win/system32/wine.dll": b"MZ" + b"\0" * 62,
+                                  "win/other/evil.exe": b"MZ" + b"\0" * 62})
+    (tmp_path / ".audit-allow").write_text("b.zip!win/system32/*\n")
+    r = run(tmp_path)
+    assert r.returncode == 1 and "evil.exe" in r.stdout and "wine.dll" not in r.stdout
+
+def test_banned_name_inside_zip_fails(tmp_path):
+    make_zip(tmp_path / "b.zip", {"game/Blur.exe": b"x", "media/intro.bik": b"x"})
+    out = run(tmp_path).stdout
+    assert "b.zip!game/Blur.exe" in out and "b.zip!media/intro.bik" in out
+
+def test_plain_allow_line_does_not_cover_zip_members(tmp_path):
+    # A plain allow line for the zip path does not vouch for its members.
+    make_zip(tmp_path / "b.zip", {"x.dll": b"MZ" + b"\0" * 62})
+    (tmp_path / ".audit-allow").write_text("b.zip\n")
+    assert run(tmp_path).returncode == 1

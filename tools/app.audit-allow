@@ -6,3 +6,7 @@ win/wine/lib/wine/x86_64-windows/*
 # Mesa's WGL/Zink (opengl32.dll and its driver), built from PS5_Mesa:
 win/mesa-zink/i386-windows/*
 win/mesa-zink/x86_64-windows/*
+# The bare prefix the bundle carries: Wine's builtin DLLs and programs as the prefix step's
+# wineboot installs them, and our DXVK (d3d8/9/10core/11, dxgi), in system32 and syswow64.
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/*
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/*
