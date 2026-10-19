@@ -164,13 +164,34 @@ bool square_held()
     return false;
 }
 
-// The game's last start, for the next start of this app to tell a game that closed at once.
+// The game's last start, for the next start of this app to tell a game that closed at once,
+// or one that was played and ended (store::last_start).
 constexpr const char *kLastStart = "/data/sahin/last-start";
 
+// The runner's one-shot request to bring this launcher back when the game ends
+// (store::return_request_path): /data/prospero-win/return-<title>.
+std::string return_request()
+{
+    return store::return_request_path("/data/prospero-win", kSingleGame);
+}
+
+// The runner takes the return request whenever Wine exits: the game quitting by itself, the
+// Options+Touchpad hold (the runner sends the game Alt+F4, Wine exits), or Wine failing to
+// start the game; each comes back here, to the page or to Home (store::choose_start). It
+// doesn't when the app is closed from the system's menu, crashes, or a game ignores the
+// Alt+F4: then the request stays, and the next start from the tile is a fresh one.
 [[noreturn]] void play_single_game(const char *why)
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
-    if (!store::mark_start(kLastStart, std::time(nullptr)))
+    const std::string request = return_request();
+    // Without the request the runner closes to Home, and a start record left behind would
+    // read as "back from the game" on the next start from the tile: no record then.
+    if (!store::request_return(request))
+    {
+        hui::sys::log("[STORE] %s not written: the game will close to Home", request.c_str());
+        (void)unlink(kLastStart);
+    }
+    else if (!store::mark_start(kLastStart, std::time(nullptr)))
         hui::sys::log("[STORE] %s not written", kLastStart);
     const char *none[] = {nullptr};
     const int refused = sceSystemServiceLoadExec("/app0/game.bin", none);
@@ -279,18 +300,37 @@ int main()
     const std::string app_root = store::system::app_folder();
     sys::log("[STORE] app folder=%s", app_root.c_str());
     // A game's own app shows its screen only when the game isn't installed yet, when the
-    // game's in-game menu left choices to apply (or asked for this screen), or when Square is
-    // held as it starts; otherwise the tile goes straight into the game.
+    // game's in-game menu left choices to apply (or asked for this screen), when the game
+    // closed right after it started, or when Square is held as it starts. Otherwise a start
+    // from the tile goes straight into the game, and the runner bringing us back after the
+    // game was played closes to Home (store::choose_start: never the game again, no loop).
     const auto ingame = kSingleGame[0] && elevated ? take_ingame_choices(storage_root) : std::nullopt;
     const bool installed = kSingleGame[0] && elevated && single_game_installed(app_root, storage_root);
-    // The game back within seconds of its start: it closed at once. The page says why, once.
-    const bool closed_early = installed && store::early_exit(kLastStart, std::time(nullptr));
+    const auto last = kSingleGame[0] && elevated
+                          ? store::last_start(kLastStart, return_request(), std::time(nullptr))
+                          : store::LastStart::none;
     if (kSingleGame[0] && elevated)
+    {
         (void)unlink(kLastStart);
+        (void)unlink(return_request().c_str()); // a request the runner never took
+    }
+    // The game back within seconds of its start: it closed at once. The page says why, once.
+    const bool closed_early = installed && last == store::LastStart::early;
     if (closed_early)
         sys::log("[STORE] the game closed right after it started: the page instead");
-    if (installed && !ingame && !closed_early && !square_held())
-        play_single_game("installed");
+    if (kSingleGame[0])
+    {
+        switch (store::choose_start(installed, ingame.has_value(), last, square_held))
+        {
+        case store::StartChoice::play:
+            play_single_game("installed");
+        case store::StartChoice::home:
+            sys::log("[STORE] back from the game: closing to Home");
+            sys::quit();
+        case store::StartChoice::page:
+            break;
+        }
+    }
     request_path = std::string(storage_root) + "/dev/request.txt";
     handled_path = std::string(storage_root) + "/handled.txt";
     // A folder left by a sandboxed run is taken back before anything is written to it.

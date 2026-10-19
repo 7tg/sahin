@@ -1,8 +1,10 @@
-// Sahin - The game closing right after it started, told on the launcher's next start.
+// Sahin - The game closing right after it started, told on the launcher's next start; and what
+// that start does: the game, the page, or back to Home.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app/early_exit.hpp"
 
 #include <cstdio>
+#include <sys/stat.h>
 
 namespace store
 {
@@ -36,5 +38,35 @@ bool early_exit(const std::string &path, std::time_t now)
         return false;
     const long long age = static_cast<long long>(now) - started;
     return age >= 0 && age < static_cast<long long>(kEarlyExitSeconds);
+}
+
+std::string return_request_path(std::string_view win_root, std::string_view title)
+{
+    return std::string(win_root) + "/return-" + std::string(title);
+}
+
+bool request_return(const std::string &path)
+{
+    std::FILE *file = std::fopen(path.c_str(), "w");
+    return file && std::fclose(file) == 0;
+}
+
+LastStart last_start(const std::string &record, const std::string &return_request, std::time_t now)
+{
+    struct stat info{};
+    if (stat(record.c_str(), &info) != 0 || stat(return_request.c_str(), &info) == 0)
+        return LastStart::none;
+    // A record that doesn't read as a recent time is a game that ran.
+    return early_exit(record, now) ? LastStart::early : LastStart::ran;
+}
+
+StartChoice choose_start(bool installed, bool ingame, LastStart last,
+                         const std::function<bool()> &square_held)
+{
+    if (!installed || ingame || last == LastStart::early)
+        return StartChoice::page;
+    if (square_held())
+        return StartChoice::page;
+    return last == LastStart::ran ? StartChoice::home : StartChoice::play;
 }
 } // namespace store
