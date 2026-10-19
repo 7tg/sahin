@@ -248,7 +248,7 @@ void *development_requests(void *)
 int main()
 {
     using namespace hui;
-    sys::log("[STORE] PPSA99400 startup");
+    sys::log("[STORE] %s startup", store::system::own_title());
     // Start-up steps, timed from here: where the wait before the first frame goes.
     const std::int64_t started_us = sys::monotonic_us();
     const auto since_start = [started_us]
