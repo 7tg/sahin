@@ -9,7 +9,7 @@ file (the download's name, or in mods/companions the one file of the plan's size
 SHA-256). The Xbox 360 zips are carried until their release exists. A missing file is
 left for the download; a file that is there but does not match is an error.
 The bare prefix (tools/make-bare-prefix.py's zip) goes beside them as
-bare-prefix-nfs-blackbox.zip.
+bare-prefix-sahin.zip.
 Each game's Home app (tools/build-prospero-win.sh apps) is zipped as <TITLEID>.zip, once
 its eboot is seen to start the profile its plan installs, and listed in apps.json (file,
 sha256, size, version) for the manager's Add to Home.
@@ -19,20 +19,20 @@ Anything a plan pins that isn't found here is an error; nothing is guessed.
 no downloads from <release>/assets (the Xbox 360 zips come from their public release; the
 app stays under the catalog's 2 GiB).
 
-  tools/make-bundle.py [--manager ../prospero-blackbox] [--release release] [--for-app]
+  tools/make-bundle.py [--manager launcher] [--release release] [--for-app]
 """
 import argparse, glob, hashlib, json, os, shutil, sys, zipfile
 from urllib.parse import unquote, urlparse
 
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ap = argparse.ArgumentParser()
-ap.add_argument('--manager', default=os.path.join(os.path.dirname(R), 'prospero-blackbox'))
+ap.add_argument('--manager', default=os.path.join(R, 'launcher'))
 ap.add_argument('--release', default=os.path.join(R, 'release'))
 ap.add_argument('--for-app', action='store_true')
 args = ap.parse_args()
-args.prefix = os.path.join(args.release, 'bare-prefix-nfs-blackbox.zip')
+args.prefix = os.path.join(args.release, 'bare-prefix-sahin.zip')
 # The manager's game apps and the plan each one plays (catalog/blackbox.cpp's title IDs).
-APPS = {'PPSA99403': 'NFSMW'}
+APPS = {'PPSA99404': 'BLUR'}
 
 
 def sha(b): return hashlib.sha256(b).hexdigest()
@@ -43,7 +43,6 @@ def sha(b): return hashlib.sha256(b).hexdigest()
 made = {}
 for path in sorted(glob.glob(os.path.join(R, 'profiles', '*', 'built', '*')) +
                    glob.glob(os.path.join(R, 'profiles', '*', '*.zip')) +
-                   glob.glob(os.path.join(args.release, 'x360', '*')) +  # tools/build-x360-bits.sh
                    glob.glob(os.path.join(args.release, 'menu', '*')) +  # tools/build-blackbox-menu.sh
                    glob.glob(os.path.join(args.release, 'settings-mod', '*'))):  # tools/build-settings-mod.sh
     if os.path.isfile(path):
@@ -156,9 +155,9 @@ if not os.path.isfile(args.prefix):
 z = zipfile.ZipFile(args.prefix)
 if z.testzip() is not None or 'system.reg' not in z.namelist():
     sys.exit(f'{args.prefix} is not a bare prefix')
-shutil.copyfile(args.prefix, os.path.join(bundle, 'bare-prefix-nfs-blackbox.zip'))
-wanted.add('bare-prefix-nfs-blackbox.zip')
-print(f"{os.path.getsize(args.prefix):>24}  bare-prefix-nfs-blackbox.zip <- {os.path.relpath(args.prefix, R)}")
+shutil.copyfile(args.prefix, os.path.join(bundle, 'bare-prefix-sahin.zip'))
+wanted.add('bare-prefix-sahin.zip')
+print(f"{os.path.getsize(args.prefix):>24}  bare-prefix-sahin.zip <- {os.path.relpath(args.prefix, R)}")
 
 # The game apps: a zip made the same way every time (sorted, fixed times), the app in a
 # folder named after its title, as the manager's archive check wants.

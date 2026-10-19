@@ -3,14 +3,14 @@
 # after the lock is released), every DLL (d3d8, d3d9, d3d10core, d3d11, dxgi) for 32- and
 # 64-bit, packed as a DXVK release archive.
 #
-#   tools/build-dxvk.sh            -> .deps/dxvk-3.1.1-nfsbb.tar.gz (path and sha256 printed)
+#   tools/build-dxvk.sh            -> .deps/dxvk-3.1.1-sahin.tar.gz (path and sha256 printed)
 #
 # Runs in the build image (tools/build.sh): meson, ninja, glslang and the MinGW-w64 GCC. The
 # archive's layout is DXVK's own (dxvk-<version>/x32|x64/<dll>.dll), so prospero-win's
 # pw_install.py takes it; it is packed with sorted names and fixed times.
 set -euo pipefail
 W=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-version=3.1.1-nfsbb
+version=3.1.1-sahin
 commit=b1a1c99ab52b687cf950d62c88bc2fa316b41663
 src=$W/.deps/dxvk-src
 work=$W/.deps/dxvk-build

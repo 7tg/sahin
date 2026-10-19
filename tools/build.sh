@@ -14,7 +14,7 @@
 # On x86-64 Linux everything runs in one container. On an Apple-silicon Mac the build runs
 # in colima's default VM through Rosetta, which runs no 32-bit x86 code, so the prefix step
 # (Wine creating a WoW64 prefix) runs in a second, fully emulated x86-64 colima VM,
-# nfsbb-x86 (colima start nfsbb-x86 --arch x86_64 --vm-type qemu; needs brew's qemu), with
+# sahin-x86 (colima start sahin-x86 --arch x86_64 --vm-type qemu; needs brew's qemu), with
 # the same image copied over.
 #
 # STEPs: the steps of tools/build-prospero-win.sh, then x360 (tools/build-x360-bits.sh),
@@ -23,11 +23,11 @@
 # bundle
 # (tools/make-bundle.py) and
 # manager (its app with the bundle); default all. --clean starts from an empty volume
-# (NFSBB_VOLUME names it; default nfsbb-work).
+# (SAHIN_VOLUME names it; default sahin-work).
 set -euo pipefail
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 manager=$(cd -- "${MANAGER:-$here/../prospero-blackbox}" && pwd)
-image=nfsbb-build volume=${NFSBB_VOLUME:-nfsbb-work}
+image=sahin-build volume=${SAHIN_VOLUME:-sahin-work}
 clean=0
 [[ ${1:-} == --clean ]] && { clean=1; shift; }
 steps=" ${*:-setup title radv zink hostwine wineps5 cpu pkg apps dxvk prefix x360 settings-mod bundle manager game-apps} "
@@ -35,7 +35,7 @@ main_sock=${DOCKER_HOST:-}
 if [[ -z $main_sock && -S $HOME/.colima/default/docker.sock ]]; then
     main_sock=unix://$HOME/.colima/default/docker.sock
 fi
-x86_sock=unix://$HOME/.colima/nfsbb-x86/docker.sock
+x86_sock=unix://$HOME/.colima/sahin-x86/docker.sock
 split=false
 [[ $(uname -m) == arm64 && $steps == *" prefix "* ]] && split=true
 d() { DOCKER_HOST=$main_sock docker "$@"; }
@@ -48,8 +48,8 @@ done
 # The image is built once per Dockerfile: it carries the Dockerfile's git hash as a label, so an
 # image built here before, or copied in (docker save | docker load), is used as it is.
 recipe=$(git -C "$here" hash-object tools/container/Dockerfile)
-[[ $(d image inspect -f '{{index .Config.Labels "nfsbb.dockerfile"}}' "$image" 2>/dev/null) == "$recipe" ]] ||
-    d build -q --platform linux/amd64 --label "nfsbb.dockerfile=$recipe" -t "$image" "$here/tools/container" >/dev/null
+[[ $(d image inspect -f '{{index .Config.Labels "sahin.dockerfile"}}' "$image" 2>/dev/null) == "$recipe" ]] ||
+    d build -q --platform linux/amd64 --label "sahin.dockerfile=$recipe" -t "$image" "$here/tools/container" >/dev/null
 (( clean )) && d volume rm -f "$volume" >/dev/null
 d volume create "$volume" >/dev/null
 mkdir -p "$here/release"
@@ -76,9 +76,9 @@ if [[ '$steps' == *' menu '* ]]; then tools/build-blackbox-menu.sh; fi
 if [[ '$steps' == *' settings-mod '* ]]; then tools/build-settings-mod.sh; fi"
 
 if $split; then
-    echo "==> bare prefix in the x86-64 VM (nfsbb-x86)"
+    echo "==> bare prefix in the x86-64 VM (sahin-x86)"
     x info >/dev/null 2>&1 ||
-        colima start nfsbb-x86 --arch x86_64 --vm-type qemu --cpu 8 --memory 8 --disk 60 ||
+        colima start sahin-x86 --arch x86_64 --vm-type qemu --cpu 8 --memory 8 --disk 60 ||
         { echo "can't start the x86-64 VM (brew install colima qemu lima-additional-guestagents)" >&2; exit 2; }
     [[ $(x image inspect -f '{{.Id}}' "$image" 2>/dev/null) == "$(d image inspect -f '{{.Id}}' "$image")" ]] ||
         d save "$image" | x load -q
@@ -86,7 +86,7 @@ if $split; then
     x volume create "$volume" >/dev/null
     # What make-bare-prefix.py reads, from the main volume to the x86-64 one.
     d run --rm --platform linux/amd64 -v "$volume:/w" "$image" tar -C /w -c \
-        nfs-blackbox-ps5/tools nfs-blackbox-ps5/profiles nfs-blackbox-ps5/.deps/dxvk-3.1.1-nfsbb.tar.gz \
+        nfs-blackbox-ps5/tools nfs-blackbox-ps5/profiles nfs-blackbox-ps5/.deps/dxvk-3.1.1-sahin.tar.gz \
         nfs-blackbox-ps5/prospero-win/tools nfs-blackbox-ps5/prospero-win/.deps/mesa-python \
         nfs-blackbox-ps5/prospero-win/.deps/wine-host/install \
         nfs-blackbox-ps5/prospero-win/.deps/wine-host/build/dlls/wowprospero/x86_64-windows/wowprospero.dll \
@@ -95,10 +95,10 @@ if $split; then
             bash -c 'rm -rf /w/nfs-blackbox-ps5 && tar -C /w -x'
     x run --rm --platform linux/amd64 -v "$volume:/w" "$image" bash -euo pipefail -c '
         cd /w/nfs-blackbox-ps5 && mkdir -p release
-        python3 tools/make-bare-prefix.py release/bare-prefix-nfs-blackbox.zip'
-    x run --rm --platform linux/amd64 -v "$volume:/w" "$image" cat /w/nfs-blackbox-ps5/release/bare-prefix-nfs-blackbox.zip |
+        python3 tools/make-bare-prefix.py release/bare-prefix-sahin.zip'
+    x run --rm --platform linux/amd64 -v "$volume:/w" "$image" cat /w/nfs-blackbox-ps5/release/bare-prefix-sahin.zip |
         d run --rm -i --platform linux/amd64 -v "$volume:/w" "$image" \
-            bash -c 'mkdir -p /w/nfs-blackbox-ps5/release && cat > /w/nfs-blackbox-ps5/release/bare-prefix-nfs-blackbox.zip'
+            bash -c 'mkdir -p /w/nfs-blackbox-ps5/release && cat > /w/nfs-blackbox-ps5/release/bare-prefix-sahin.zip'
 fi
 
 run d "
@@ -126,10 +126,10 @@ if [[ '$steps' == *' game-apps '* ]]; then
     python3 tools/make-app-zip.py \$A release/game-apps/PPSA99403.zip
 fi
 # The outputs, and their hashes.
-rm -rf /out/PPSA99995 /out/apps /out/x360 /out/menu /out/settings-mod /out/game-apps /out/PPSA99400 /out/bare-prefix-nfs-blackbox.zip /out/SHA256SUMS
+rm -rf /out/PPSA99995 /out/apps /out/x360 /out/menu /out/settings-mod /out/game-apps /out/PPSA99400 /out/bare-prefix-sahin.zip /out/SHA256SUMS
 cp -a release/. /out/
 if [[ -d /w/prospero-blackbox/dist/PPSA99400 ]]; then cp -a /w/prospero-blackbox/dist/PPSA99400 /out/; fi
 # Only what this build made: release/ may hold other files (tools/make-x360-assets.py's zips).
-cd /out && find ./PPSA99995 ./apps ./x360 ./menu ./settings-mod ./game-apps ./PPSA99400 ./bare-prefix-nfs-blackbox.zip -type f -print0 2>/dev/null |
+cd /out && find ./PPSA99995 ./apps ./x360 ./menu ./settings-mod ./game-apps ./PPSA99400 ./bare-prefix-sahin.zip -type f -print0 2>/dev/null |
     sort -z | xargs -0 sha256sum > SHA256SUMS
 echo \"==> \$(wc -l < SHA256SUMS) files; release/SHA256SUMS: \$(sha256sum SHA256SUMS | cut -c1-16)\""

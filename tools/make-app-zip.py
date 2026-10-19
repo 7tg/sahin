@@ -5,7 +5,7 @@ installs (its <TITLEID>/ folder at the top, under 2 GiB).
 Entries sorted, fixed times (2026-01-01), deflated, no links or .DS_Store; the same folder
 gives the same bytes on any machine (the zips tools/make-bundle.py makes are made this way).
 
-  tools/make-app-zip.py release/game-apps/PPSA99403 release/game-apps/PPSA99403.zip
+  tools/make-app-zip.py release/game-apps/PPSA99404 release/game-apps/PPSA99404.zip
 """
 import hashlib, json, os, shutil, sys, zipfile
 

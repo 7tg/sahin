@@ -5,7 +5,7 @@
 
 Uses the trees tools/build-prospero-win.sh built (host Wine, wowprospero.dll,
 wow64native.dll) and tools/build-dxvk.sh built (our DXVK, 3.1.1 with patches/dxvk/).
-First prospero-win's pw_install.py creates the prefix from profiles/nfsmw/bare-prefix.yml
+First prospero-win's pw_install.py creates the prefix from profile/blur/bare-prefix.yml
 (an empty WoW64 prefix) with that DXVK, in .deps/bare-lib. Then it is packed the way tools/pw_prefix.py pushes a prefix to the
 console, with pw_prefix's own rules:
 - links inside the prefix become .pw-symlinks tables (a title can't make links);
@@ -40,7 +40,7 @@ UNIX_TIME = 1767225600
 FILETIME = (UNIX_TIME + 11644473600) * 10_000_000
 HOST = b"prospero"
 LUID = b"00,04,00,00,00,00,00,00"  # the display adapter's (0x400)
-DXVK_VERSION = "3.1.1-nfsbb"
+DXVK_VERSION = "3.1.1-sahin"
 DXVK = ROOT / f".deps/dxvk-{DXVK_VERSION}.tar.gz"
 EXTRA = {"drive_c/windows/system32/wowprospero.dll":
          PW / ".deps/wine-host/build/dlls/wowprospero/x86_64-windows/wowprospero.dll",
@@ -51,7 +51,7 @@ def fixed_ids(data: bytes, key: str = "") -> bytes:
     """The values wineboot makes up at random, fixed: every console unpacking this prefix
     shares them anyway, as with any prefix copied from a PC."""
     for name in (b"MachineGuid", b"MachineId", b"VideoID"):
-        value = str(uuid.uuid5(uuid.NAMESPACE_URL, "nfs-blackbox-ps5/bare-prefix/" + name.decode()))
+        value = str(uuid.uuid5(uuid.NAMESPACE_URL, "sahin/bare-prefix/" + name.decode()))
         data = re.sub(rb'^("' + name + rb'"=")(\{?)[0-9a-fA-F-]{36}(\}?")',
                       lambda m: m.group(1) + m.group(2) + value.encode() + m.group(3), data, flags=re.M)
     # A HID device and its compatible device share a ContainerId; its random part is zeroed,
@@ -97,11 +97,11 @@ def main() -> int:
     if not DXVK.is_file():
         sys.exit(f"missing {DXVK}: run tools/build-dxvk.sh first")
     library = ROOT / ".deps/bare-lib"
-    prefix = library / "prefixes/nfs-blackbox"
+    prefix = library / "prefixes/sahin"
     if library.exists():
         shutil.rmtree(library)  # always from scratch
     # The recipe with our DXVK (pw_install's local-archive keys) under script.wine.
-    recipe = (ROOT / "profiles/nfsmw/bare-prefix.yml").read_text()
+    recipe = (ROOT / "profile/blur/bare-prefix.yml").read_text()
     digest = hashlib.sha256(DXVK.read_bytes()).hexdigest()
     marker = "\n  wine:\n"
     assert recipe.count(marker) == 1, "bare-prefix.yml: no script.wine section"

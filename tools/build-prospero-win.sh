@@ -8,7 +8,7 @@
 #
 # Steps, in order:
 #   setup     the source trees (each patched branch made anew when its patches change):
-#             prospero-win nfs-v020 = 644e32e + patches/prospero-win,
+#             prospero-win sahin-v020 = 644e32e + patches/prospero-win,
 #             PS5_Mesa = 01d7057 + patches/PS5_Mesa, PS5_Vulkan = 8aee3af + patches/PS5_Vulkan/v020
 #             (all applied with fixed committer dates, so the same hashes anywhere), Wine at
 #             the pinned commit, Mesa's Python tools, llvm-mingw, the PRX link tool
@@ -21,7 +21,7 @@
 #   pkg       the package -> release/PPSA99995 (git-ignored)
 #   apps      the games' own Home apps -> <release>/apps (art from art/)
 #   dxvk      our DXVK: 3.1.1 + patches/dxvk/, every DLL for 32/64-bit (tools/build-dxvk.sh)
-#   prefix    the bare Wine prefix the manager unpacks, with that DXVK -> <release>/bare-prefix-nfs-blackbox.zip
+#   prefix    the bare Wine prefix the manager unpacks, with that DXVK -> <release>/bare-prefix-sahin.zip
 #             (tools/make-bare-prefix.py: created by host Wine, packed as pw_prefix pushes it)
 set -euo pipefail
 # Every link globs the SDK's stubs ("$sdk"/target/lib/*.so), and each import goes to the first
@@ -54,26 +54,26 @@ series() { # repo-dir base branch patches... : the branch made anew whenever the
     local repo=$1 base=$2 branch=$3 sum
     sum=$(cat "${@:4}" | sha256sum | cut -c1-64)
     git -C "$repo" rev-parse -q --verify "$branch" >/dev/null &&
-        [[ $(git -C "$repo" config --get "nfsbb.$branch-series" || true) == "$sum" ]] && return
+        [[ $(git -C "$repo" config --get "sahin.$branch-series" || true) == "$sum" ]] && return
     git -C "$repo" cat-file -e "$base^{commit}" 2>/dev/null || git -C "$repo" fetch -q origin "$base" ||
         git -C "$repo" fetch -q origin
     git -C "$repo" switch -q -f -C "$branch" "$base"
     am "$repo" "$base" "${@:4}"
-    git -C "$repo" config "nfsbb.$branch-series" "$sum"
+    git -C "$repo" config "sahin.$branch-series" "$sum"
 }
 
 if want setup; then
     say "setup: source trees"
     git -C "$W" submodule update --init PS5_Mesa PS5_Vulkan PS5_PayloadSDK ps5-native-app-boilerplate
     [[ -d $PW/.git ]] || git clone -q https://github.com/mpereiraesaa/prospero-win.git "$PW"
-    series "$PW" "$PW_BASE" nfs-v020 "$W"/patches/prospero-win/*.patch
+    series "$PW" "$PW_BASE" sahin-v020 "$W"/patches/prospero-win/*.patch
     series "$W/PS5_Mesa" "$MESA_BASE" ps5-app0-param-v020 "$W"/patches/PS5_Mesa/*.patch
     [[ $(git -C "$W/PS5_Mesa" rev-parse ps5-app0-param-v020) == "$MESA_REV" ]] ||
         { echo "PS5_Mesa ps5-app0-param-v020 is not $MESA_REV" >&2; exit 2; }
-    series "$W/PS5_Vulkan" "$VULKAN_BASE" nfs-v020 "$W"/patches/PS5_Vulkan/v020/*.patch
-    git -C "$W/PS5_Vulkan" switch -q nfs-v020
+    series "$W/PS5_Vulkan" "$VULKAN_BASE" sahin-v020 "$W"/patches/PS5_Vulkan/v020/*.patch
+    git -C "$W/PS5_Vulkan" switch -q sahin-v020
     git -C "$W/PS5_Mesa" switch -q ps5-app0-param-v020
-    git -C "$PW" switch -q nfs-v020
+    git -C "$PW" switch -q sahin-v020
     if [[ $(git -C "$SRC" rev-parse HEAD 2>/dev/null) != "$WINE_COMMIT" ]]; then
         say "setup: Wine $WINE_COMMIT"
         mkdir -p "$SRC"
@@ -166,7 +166,7 @@ if want apps; then
         [[ -f $W/art/$art.at9 ]] && args+=(--music "$W/art/$art.at9")
         tools/build_game_app.sh "${args[@]}"
     done <<'APPS'
-PPSA99403|NFS Most Wanted|pb-nfsmw|nfs-most-wanted-2005
+PPSA99404|Sahin|pb-blur|sahin
 APPS
 fi
 if want dxvk; then
@@ -174,8 +174,8 @@ if want dxvk; then
     "$W/tools/build-dxvk.sh"
 fi
 if want prefix; then
-    say "bare prefix -> $out/bare-prefix-nfs-blackbox.zip"
-    python3 "$W/tools/make-bare-prefix.py" "$out/bare-prefix-nfs-blackbox.zip"
-    sha256sum "$out/bare-prefix-nfs-blackbox.zip"
+    say "bare prefix -> $out/bare-prefix-sahin.zip"
+    python3 "$W/tools/make-bare-prefix.py" "$out/bare-prefix-sahin.zip"
+    sha256sum "$out/bare-prefix-sahin.zip"
 fi
 say "done: $steps"
