@@ -55,6 +55,21 @@ int main()
     assert(fs::exists(request) && fs::file_size(request) == 0);
     assert(!store::request_return((dir / "nowhere" / "return-PPSA99404").string()));
 
+    // prepare_launch: record then request, both there on success.
+    {
+        const std::string rec = (dir / "pl-record").string(), req = (dir / "pl-request").string();
+        assert(store::prepare_launch(rec, req, now));
+        assert(fs::exists(rec) && fs::exists(req));
+        fs::remove(rec);
+        fs::remove(req);
+        // Record unwritable: no request left.
+        assert(!store::prepare_launch((dir / "nowhere" / "r").string(), req, now));
+        assert(!fs::exists(req));
+        // Request unwritable: the record is removed again.
+        assert(!store::prepare_launch(rec, (dir / "nowhere" / "q").string(), now));
+        assert(!fs::exists(rec));
+    }
+
     // The last start as the launcher's next start sees it.
     using store::LastStart;
     fs::remove(path);

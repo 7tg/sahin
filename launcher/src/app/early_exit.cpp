@@ -51,6 +51,22 @@ bool request_return(const std::string &path)
     return file && std::fclose(file) == 0;
 }
 
+bool prepare_launch(const std::string &record, const std::string &request, std::time_t now)
+{
+    if (!mark_start(record, now))
+    {
+        std::remove(record.c_str()); // a half-written record
+        return false;
+    }
+    if (!request_return(request))
+    {
+        std::remove(request.c_str());
+        std::remove(record.c_str());
+        return false;
+    }
+    return true;
+}
+
 LastStart last_start(const std::string &record, const std::string &return_request, std::time_t now)
 {
     struct stat info{};

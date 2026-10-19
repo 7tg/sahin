@@ -34,6 +34,13 @@ std::string return_request_path(std::string_view win_root, std::string_view titl
 // Writes the (empty) request. False when it can't be written.
 bool request_return(const std::string &path);
 
+// Hands over to the game: the start record first, then the return request, only when the
+// record is there (a request without a record would bring the launcher back to play the game
+// again, over and over). When the request can't be written the record is removed again: the
+// runner then closes to Home, and a record would read as "back from the game" on the next
+// start from the tile. False when either failed (nothing is left behind).
+bool prepare_launch(const std::string &record, const std::string &request, std::time_t now);
+
 // The previous start of the game, as this start of the launcher sees it.
 enum class LastStart
 {

@@ -184,15 +184,12 @@ std::string return_request()
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
     const std::string request = return_request();
-    // Without the request the runner closes to Home, and a start record left behind would
-    // read as "back from the game" on the next start from the tile: no record then.
-    if (!store::request_return(request))
-    {
-        hui::sys::log("[STORE] %s not written: the game will close to Home", request.c_str());
-        (void)unlink(kLastStart);
-    }
-    else if (!store::mark_start(kLastStart, std::time(nullptr)))
-        hui::sys::log("[STORE] %s not written", kLastStart);
+    // The start record first, then the request only if the record is there: a request left
+    // without a record would bring the launcher back to play the game again. Without the
+    // request the runner closes to Home, and no record is left for the next start.
+    if (!store::prepare_launch(kLastStart, request, std::time(nullptr)))
+        hui::sys::log("[STORE] %s / %s not written: the game will close to Home", kLastStart,
+                      request.c_str());
     const char *none[] = {nullptr};
     const int refused = sceSystemServiceLoadExec("/app0/game.bin", none);
     hui::sys::log("[STORE] LoadExec /app0/game.bin refused rc=0x%08x", static_cast<unsigned>(refused));
