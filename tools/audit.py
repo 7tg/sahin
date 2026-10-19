@@ -4,7 +4,7 @@ game data, publisher media or Microsoft redistributables.
 
   tools/audit.py ROOT [ROOT...]
 
-ROOT/.audit-allow lists globs (relative to ROOT) of files built from source that may be PE
+ROOT/.audit-allow lists globs (relative to ROOT; blank lines and # comments ignored) of files built from source that may be PE
 files (Wine's DLLs, DXVK). Exit 0 clean, 1 with one line per finding.
 """
 import fnmatch, pathlib, sys
@@ -29,7 +29,10 @@ def is_pe(path):
 def audit(root):
     root = pathlib.Path(root)
     allow_file = root / ".audit-allow"
-    allow = allow_file.read_text().split() if allow_file.exists() else []
+    allow = []
+    if allow_file.exists():
+        allow = [line.strip() for line in allow_file.read_text().splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
     findings = []
     for path in sorted(root.rglob("*")):
         rel = path.relative_to(root)

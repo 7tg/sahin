@@ -25,3 +25,10 @@ def test_allowlist_file_skips_known_builds(tmp_path):
     (tmp_path / "wine.dll").write_bytes(b"MZ" + b"\0" * 100)
     (tmp_path / ".audit-allow").write_text("wine.dll\n")
     assert run(tmp_path).returncode == 0
+
+def test_allowlist_ignores_blank_and_comment_lines(tmp_path):
+    (tmp_path / "wine.dll").write_bytes(b"MZ" + b"\0" * 100)
+    (tmp_path / "#note").write_bytes(b"MZ" + b"\0" * 100)
+    (tmp_path / ".audit-allow").write_text("#note\n\nwine.dll\n   \n")
+    r = run(tmp_path)
+    assert "wine.dll" not in r.stdout and "#note" in r.stdout
