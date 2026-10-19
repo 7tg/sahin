@@ -170,7 +170,7 @@ if want apps; then
     fi
     # title id | name | the profile it starts | art (art/<art>.png icon, -bg.png background,
     # -logo.png, .at9 music). The manager's apps (PPSA994xx) start the id their game's plan
-    # gives its profile (prospero-blackbox/assets/plans/<game>.json).
+    # gives its profile (launcher/assets/plans/<game>.json).
     while IFS='|' read -r tid name profile art; do
         [[ -z $tid || $tid == \#* ]] && continue
         args=(--title-id "$tid" --name "$name" --profile "$profile" --package "$out/PPSA99995" --out "$out/apps")
