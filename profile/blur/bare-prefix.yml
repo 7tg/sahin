@@ -1,0 +1,17 @@
+# Creates an empty shared prefix and nothing else. pw_install still installs
+# DXVK because graphics is dxvk.
+name: "bare sahin"
+game_slug: bare-sahin
+runner: wine
+prospero:
+  name: bare
+  prefix: sahin
+  graphics: dxvk
+script:
+  game:
+    exe: drive_c/windows/system32/notepad.exe
+    prefix: $GAMEDIR
+  wine:
+    overrides: {}
+  installer:
+  - task: {name: create_prefix, prefix: $GAMEDIR, arch: win32}
