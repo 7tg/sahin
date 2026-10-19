@@ -124,7 +124,21 @@ if want hostwine; then
 fi
 if want wineps5; then
     say "Wine PS5 modules"
-    tools/build_wine_ps5.sh --source "$SRC" --host-tools "$PW/.deps/wine-host/build" \
+    # FreeType's tarball, fetched here: Savannah's download address redirects to a random
+    # mirror, and some of them don't answer. The same file from Savannah's own server, or
+    # from SourceForge, checked against the hash build_wine_ps5.sh pins.
+    ft=freetype-2.13.3.tar.xz
+    ft_sha=0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289
+    mkdir -p "$W/downloads"
+    for url in https://download-mirror.savannah.gnu.org/releases/freetype/$ft \
+        https://downloads.sourceforge.net/project/freetype/freetype2/2.13.3/$ft \
+        https://download.savannah.gnu.org/releases/freetype/$ft; do
+        printf '%s  %s\n' "$ft_sha" "$W/downloads/$ft" | sha256sum --check --status 2>/dev/null && break
+        curl -sfL --retry 3 -o "$W/downloads/$ft.part" "$url" &&
+            printf '%s  %s\n' "$ft_sha" "$W/downloads/$ft.part" | sha256sum --check --status &&
+            mv "$W/downloads/$ft.part" "$W/downloads/$ft" || rm -f "$W/downloads/$ft.part"
+    done
+    PROSPERO_FREETYPE_TARBALL=$W/downloads/$ft tools/build_wine_ps5.sh --source "$SRC" --host-tools "$PW/.deps/wine-host/build" \
         --prx-foundation "$W/ps5-native-app-boilerplate" --radv "$W/PS5_Vulkan" --jobs "$jobs"
 fi
 if want cpu; then
