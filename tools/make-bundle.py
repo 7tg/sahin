@@ -2,7 +2,7 @@
 """Fill the manager's assets/bundle: what a dev build carries so it installs a game on its own.
 
 For every plan in <manager>/assets/plans, each source with no download address (the files
-this repo makes: speed.exe, the 1.2 -> 1.3 diff, DSOAL, the D3DX DLLs and our ASI) is written to
+this repo makes: the built files and diffs) is written to
 assets/bundle/<sha256>, checked against the plan's hash and size. A source that does have an
 address is carried the same way when <release>/assets or mods/companions holds that
 file (the download's name, or in mods/companions the one file of the plan's size and
