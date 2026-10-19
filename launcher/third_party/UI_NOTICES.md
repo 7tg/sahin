@@ -23,7 +23,7 @@ ps5-homebrew-ui exists thanks to the maintainers and contributors of:
 - Inigo Quilez, whose published signed-distance functions the shape shader
   follows (rounded box, triangle, star and arc).
 
-The rendering kit, the sound mixer and the sound effects come from
+The rendering kit and the sound mixer come from
 [ProsperoPuzzles](https://github.com/blackbearreloaded/ProsperoPuzzles) and
 ProsperoEden, both by BlackBearReloaded.
 
@@ -50,17 +50,11 @@ The baker uses [stb_truetype](https://github.com/nothings/stb)
 tool uses stb_image_write (`third_party/stb/stb_image_write.h`, same terms).
 Both are host-only and are not linked into the PS5 application.
 
-## Sound effects and music
+## Sound effects
 
-`assets/audio/sfx/paper/*.wav` are the sound effects of ProsperoPuzzles and
-`assets/audio/sfx/glass/*.wav` those of ProsperoEden. They were generated for
-those projects with ElevenLabs Sound Effects v2 and prepared with
-`tools/process-sfx.py` (trimmed, faded and levelled). `assets/audio/sfx/menu/*.wav`
-are the store's own button clicks, synthesized by `tools/make-menu-sfx.py`.
-`assets/audio/music/*.ogg` ("First Light",
-"Open Strings" and "Quiet Hours") are the project's own background music,
-supplied by its owner and encoded to 48 kHz OGG Vorbis at -18 LUFS. All are
-Copyright (C) 2026 BlackBearReloaded and distributed under the project licence.
+`assets/audio/sfx/menu/*.wav` are the store's own button clicks, synthesized by
+`tools/make-menu-sfx.py`, Copyright (C) 2026 BlackBearReloaded and distributed
+under the project licence. No music is shipped.
 
 ## Music decoding
 
