@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -102,6 +104,41 @@ int main()
     fs::remove_all(copy / "MOVIES");
     found = inspect(copy.string(), game);
     assert(found.state == State::incomplete && found.detail.find("MOVIES") != std::string::npos);
+
+    // The version file's CRC is read once while it is unchanged; a changed file is read again.
+    {
+        fs::create_directories(copy / "MOVIES");
+        const auto before = crc_reads_for_test();
+        put(copy / "DATA" / "data.bin", current);
+        assert(inspect(copy.string(), game).state == State::ready);
+        assert(crc_reads_for_test() == before + 1);
+        assert(inspect(copy.string(), game).state == State::ready);
+        assert(crc_reads_for_test() == before + 1);
+        put(copy / "DATA" / "data.bin", older); // other size
+        assert(inspect(copy.string(), game).state == State::needs_patch);
+        assert(crc_reads_for_test() == before + 2);
+        std::string same_size = older;
+        same_size[0] = 'X'; // same size, later mtime
+        struct timespec times[2] = {{1'000'000'000, 0}, {1'000'000'000, 0}};
+        put(copy / "DATA" / "data.bin", same_size);
+        utimensat(AT_FDCWD, (copy / "DATA" / "data.bin").c_str(), times, 0);
+        assert(inspect(copy.string(), game).state == State::unknown);
+        assert(crc_reads_for_test() == before + 3);
+        put(copy / "DATA" / "data.bin", current);
+    }
+
+    // base-games/Game in any case is found, and counts as present for an import.
+    {
+        const fs::path other = root / "other";
+        fs::create_directories(other / "base-games");
+        fs::rename(copy, other / "base-games" / "Game");
+        found = locate(other.string(), roots, game);
+        assert(!found.on_usb && found.path == (other / "base-games" / "Game").string());
+        assert(found.state == State::ready || found.state == State::needs_patch);
+        assert(!import_base((usb / "game").string(), other.string(), game, [](auto &) {}, cancel, error));
+        assert(error.find("already exists") != std::string::npos);
+        fs::rename(other / "base-games" / "Game", copy);
+    }
 
     // A cancelled import leaves nothing behind; a link is refused.
     fs::remove_all(data / "base-games");

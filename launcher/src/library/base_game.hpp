@@ -62,6 +62,9 @@ struct BaseGame
 // The game's folder resolved without regard to case ("" when there is none).
 std::string find_entry(const std::string &folder, const std::string &relative);
 
+// How many times a version file's contents were read (not served from the CRC cache); for tests.
+unsigned crc_reads_for_test();
+
 // Checks one folder against the manifest.
 BaseGame inspect(const std::string &folder, const Manifest &manifest);
 

@@ -6,6 +6,9 @@
 #include <cerrno>
 #include <cstring>
 #include <dirent.h>
+#include <map>
+#include <mutex>
+#include <tuple>
 #include <fcntl.h>
 #include <strings.h>
 #include <sys/stat.h>
@@ -19,13 +22,15 @@ namespace
 
 // Blur (2010) for PC: one release, 1.2. The exe is never checked (any DRM-free exe is
 // accepted); cache/root.pak tells a known copy, and an unknown one is installed with a warning.
-constexpr const char *kBlurFolders[] = {"cache", "levels", "UI"};
+constexpr const char *kBlurFolders[] = {"cache", "levels", "UI", "UI/movies"};
 constexpr const char *kBlurFiles[] = {"Blur.exe", "binkw32.dll", "cache/root.pak",
-                                      "cache/gamedata.pak", "cache/boot.pak"};
+                                      "cache/gamedata.pak", "cache/boot.pak",
+                                      "cache/gamedata.sig", "cache/gamedata_boot.sig"};
 constexpr Release kBlurReleases[] = {
     {"1.2", 559652864, 0x1deb5c87, false},
 };
-constexpr const char *kBlurModFiles[] = {"scripts", "amax", "dinput8.dll", "d3d9.dll", "dsound.dll"};
+constexpr const char *kBlurModFiles[] = {"scripts", "amax", "dinput8.dll", "d3d9.dll", "dsound.dll",
+                                         "lua5.1.dll", "discord-rpc.dll"};
 constexpr Manifest kBlur = []
 {
     Manifest m{"BLUR", kBlurFolders, kBlurFiles, "cache/root.pak", kBlurReleases, kBlurModFiles};
@@ -87,6 +92,48 @@ bool crc_of(const std::string &path, std::uint32_t &crc)
     return count == 0;
 }
 
+// The CRC of the version file is read once per (path, size, mtime): the service checks the
+// base games every pass, and the file is half a gigabyte. inspect runs on the service thread
+// and on install jobs, so the cache is guarded.
+struct CrcKey
+{
+    std::string path;
+    std::uint64_t size;
+    std::int64_t mtime_sec;
+    std::int64_t mtime_nsec;
+    bool operator==(const CrcKey &o) const
+    {
+        return std::tie(path, size, mtime_sec, mtime_nsec) == std::tie(o.path, o.size, o.mtime_sec, o.mtime_nsec);
+    }
+};
+std::mutex crc_guard;
+std::map<std::string, std::pair<CrcKey, std::uint32_t>> crc_cache;
+std::atomic<unsigned> crc_reads{0};
+
+bool cached_crc_of(const std::string &path, std::uint32_t &crc)
+{
+    struct stat info{};
+    if (lstat(path.c_str(), &info) != 0 || !S_ISREG(info.st_mode))
+        return false;
+    const CrcKey key{path, static_cast<std::uint64_t>(info.st_size),
+                     static_cast<std::int64_t>(info.st_mtim.tv_sec),
+                     static_cast<std::int64_t>(info.st_mtim.tv_nsec)};
+    {
+        std::lock_guard lock(crc_guard);
+        if (const auto it = crc_cache.find(path); it != crc_cache.end() && it->second.first == key)
+        {
+            crc = it->second.second;
+            return true;
+        }
+    }
+    ++crc_reads;
+    if (!crc_of(path, crc))
+        return false;
+    std::lock_guard lock(crc_guard);
+    crc_cache[path] = {key, crc};
+    return true;
+}
+
 std::string join(const std::vector<std::string> &items)
 {
     std::string text;
@@ -103,6 +150,11 @@ const Manifest *manifest_for(const std::string &folder)
         if (folder == manifest->folder)
             return manifest;
     return nullptr;
+}
+
+unsigned crc_reads_for_test()
+{
+    return crc_reads;
 }
 
 std::string find_entry(const std::string &folder, const std::string &relative)
@@ -157,7 +209,7 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
     const auto version_path = find_entry(folder, manifest.version_file);
     std::uint64_t size = 0;
     std::uint32_t crc = 0;
-    if (!is_file(version_path, &size) || !crc_of(version_path, crc))
+    if (!is_file(version_path, &size) || !cached_crc_of(version_path, crc))
     {
         result.state = State::incomplete;
         result.detail = std::string("Can't read ") + manifest.version_file + ".";
@@ -195,8 +247,10 @@ BaseGame locate(const std::string &data_root, std::span<const std::string> roots
                 const Manifest &manifest)
 {
     const auto base = data_root + "/base-games/" + manifest.folder;
-    if (is_directory(base))
-        return inspect(base, manifest);
+    // base-games/Blur, BLUR or blur: whatever case the copy was made in.
+    if (const auto existing = find_entry(data_root + "/base-games", manifest.folder);
+        !existing.empty() && is_directory(existing))
+        return inspect(existing, manifest);
     for (const auto &root : roots)
         if (const auto path = find_entry(root, manifest.folder); !path.empty() && is_directory(path))
         {
@@ -229,9 +283,10 @@ bool import_base(const std::string &from, const std::string &data_root, const Ma
 {
     const auto games = data_root + "/base-games";
     const auto target = games + "/" + manifest.folder, work = target + ".importing";
-    if (is_directory(target))
+    if (const auto existing = find_entry(games, manifest.folder);
+        !existing.empty() && is_directory(existing))
     {
-        error = target + " already exists";
+        error = existing + " already exists";
         return false;
     }
     if (mkdir(games.c_str(), 0777) != 0 && errno != EEXIST)
