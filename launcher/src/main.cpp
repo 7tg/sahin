@@ -111,17 +111,20 @@ std::optional<store::InGame> take_ingame_choices(const std::string &storage_root
         if (key == "overlay")
             choices.overlay = store::library::overlay_named(value);
         // cursor= (Off / Touchpad) is no longer offered: the touchpad cursor always.
-        else if (key == "x360")
-            choices.x360 = value == "on" ? 1 : 0;
+        else if (key.starts_with("option.") && key.size() > 7)
+            choices.options[std::string(key.substr(7))] = value == "on";
         else if (key == "repair")
             choices.repair = value == "1";
         else if (key == "setup")
             choices.setup = value == "1";
     }
-    hui::sys::log("[STORE] in-game choices: overlay=%s cursor=%s x360=%d repair=%d setup=%d",
+    std::string options;
+    for (const auto &[id, on] : choices.options)
+        options += (options.empty() ? "" : ",") + id + (on ? "=on" : "=off");
+    hui::sys::log("[STORE] in-game choices: overlay=%s cursor=%s options=%s repair=%d setup=%d",
                   choices.overlay ? store::library::overlay_name(*choices.overlay) : "-",
-                  choices.cursor ? store::library::cursor_name(*choices.cursor) : "-", choices.x360,
-                  choices.repair, choices.setup);
+                  choices.cursor ? store::library::cursor_name(*choices.cursor) : "-",
+                  options.empty() ? "-" : options.c_str(), choices.repair, choices.setup);
     return choices;
 }
 

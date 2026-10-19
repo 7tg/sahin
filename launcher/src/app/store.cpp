@@ -657,12 +657,12 @@ void Screen::refresh_detail()
         const std::string folder = base.path.substr(base.path.find_last_of('/') + 1);
         if ((base.state == State::ready || base.state == State::needs_patch) && base.on_usb)
             blocks.push_back(Block::paragraph(
-                "Your copy is on the USB drive. Pick the Xbox 360 look or not, then Install: your "
+                "Your copy is on the USB drive. Pick the options on the right, then Install: your "
                 "copy is copied to the console as part of it, and the USB copy is left as it "
                 "is."));
         else if (base.state == State::ready || base.state == State::needs_patch)
             blocks.push_back(Block::paragraph(
-                "Your copy is ready. Pick the Xbox 360 look or not, then Install. Your copy is "
+                "Your copy is ready. Pick the options on the right, then Install. Your copy is "
                 "left as it is; the game is built from it with its mods."));
         else
         {
@@ -1236,16 +1236,28 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
         if (input.is_pressed(hold_.style.action))
             return; // the hold has begun, or a tap shows "Hold to uninstall"
     }
-    if (!single_game_.empty() && shown.base_known && !state.busy &&
-        input.nav != Direction::none && !shown.game_options.empty())
+    if (const auto rows = single_game_.empty() || !shown.base_known || state.busy
+                              ? std::vector<SingleRow>{}
+                              : single_rows(shown);
+        !rows.empty() && input.nav != Direction::none)
     {
-        // A game's own app: left and right pick the Xbox 360 look; it is applied by Cross.
-        // (The overlay and the rest are in the game's own Options menu, PS5 Options.)
-        const bool vertical = input.nav == Direction::up || input.nav == Direction::down;
-        const int next = vertical ? single_x360_
-                                  : std::clamp(single_x360_ + (input.nav == Direction::right ? 1 : -1), 0, 1);
-        feedback.play(next == single_x360_ ? audio::Cue::error : audio::Cue::toggle);
-        single_x360_ = next;
+        // A game's own app: up and down move between its rows, left and right pick. An option
+        // is applied by Cross (a repair); a setting is kept at once.
+        const int count = static_cast<int>(rows.size());
+        single_row_ = std::clamp(single_row_, 0, count - 1);
+        if (input.nav == Direction::up || input.nav == Direction::down)
+        {
+            const int next = std::clamp(single_row_ + (input.nav == Direction::down ? 1 : -1), 0, count - 1);
+            feedback.play(next == single_row_ ? audio::Cue::error : audio::Cue::focus);
+            single_row_ = next;
+            return;
+        }
+        const auto &row = rows[static_cast<std::size_t>(single_row_)];
+        const int next = std::clamp(row.value + (input.nav == Direction::right ? 1 : -1), 0,
+                                    static_cast<int>(row.values.size()) - 1);
+        feedback.play(next == row.value ? audio::Cue::error : audio::Cue::toggle);
+        if (next != row.value)
+            single_choose(shown, single_row_, next);
         return;
     }
     if (input.is_pressed(Action::confirm) && state.primary != Order::Kind::none)
@@ -1272,13 +1284,10 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
         }
         else if (state.primary == Order::Kind::install_game && !single_game_.empty())
         {
-            // A game's own app: the 360 look is chosen on the page; no question.
+            // A game's own app: the options are chosen on the page; no question.
             press_.trigger();
             feedback.play(audio::Cue::select);
-            order(shown, state.primary,
-                  single_x360_ == 1 && !shown.game_options.empty()
-                      ? std::vector<std::string>{shown.game_options.front().id}
-                      : std::vector<std::string>{});
+            order(shown, state.primary, single_chosen());
         }
         else if (state.primary == Order::Kind::install_game && !shown.game_options.empty())
         {
@@ -1376,14 +1385,14 @@ void Screen::close_developer()
 void Screen::update(const InputFrame &raw, float dt, ui::Feedback &feedback)
 {
     time_ += dt;
-    if (const App *shown = page_app(); !single_game_.empty() && single_x360_ < 0 && shown &&
-                                       shown->base_known && !shown->game_options.empty())
-        single_x360_ = shown->game_options.front().on ? 1 : 0;
+    if (const App *shown = page_app(); !single_game_.empty() && single_options_.empty() && shown &&
+                                       shown->base_known)
+        single_options_ = shown->game_options; // as installed, or the plan's defaults
     if (const App *shown = page_app(); ingame_ && shown && shown->game_installed && installer_ &&
                                        activity_.id.empty() && pending_order.kind == Order::Kind::none)
     {
-        // The in-game menu's choices: the overlay into the settings, then a repair when the 360
-        // look changes or one was asked for, else the profile alone; then the game, unless the
+        // The in-game menu's choices: the overlay into the settings, then a repair when an
+        // option changes or one was asked for, else the profile alone; then the game, unless the
         // player quit to this screen.
         const InGame choices = *ingame_;
         ingame_.reset();
@@ -1404,16 +1413,11 @@ void Screen::update(const InputFrame &raw, float dt, ui::Feedback &feedback)
             settings_changed = settings_changed || before != *choices.cursor;
             settings_.cursors[shown->title_id] = *choices.cursor;
         }
-        const bool x360_on = !shown->game_options.empty() && shown->game_options.front().on;
-        const bool x360_changes = choices.x360 >= 0 && !shown->game_options.empty() &&
-                                  (choices.x360 == 1) != x360_on;
-        if (choices.x360 >= 0)
-            single_x360_ = choices.x360;
-        if (choices.repair || x360_changes)
-            order(*shown, Order::Kind::install_game,
-                  (choices.x360 < 0 ? x360_on : choices.x360 == 1) && !shown->game_options.empty()
-                      ? std::vector<std::string>{shown->game_options.front().id}
-                      : std::vector<std::string>{});
+        for (auto &option : single_options_)
+            if (const auto named = choices.options.find(option.id); named != choices.options.end())
+                option.on = named->second;
+        if (choices.repair || single_options_change(*shown))
+            order(*shown, Order::Kind::install_game, single_chosen());
         else if (changed)
             order(*shown, Order::Kind::game_settings);
         play_after_ = !choices.setup && pending_order.kind != Order::Kind::none;
@@ -1421,10 +1425,13 @@ void Screen::update(const InputFrame &raw, float dt, ui::Feedback &feedback)
             order(*shown, Order::Kind::play);
     }
     {
-        // The action box grows while the page's game installs, to list its stages.
+        // The action box grows while the page's game installs, to list its stages, and on a
+        // game's own page when its choices need the room.
         const App *shown = page_app();
-        const float target =
-            shown && activity_.stage >= 0 && activity_.id == shown->title_id ? 1.0f : 0.0f;
+        const bool stages = shown && activity_.stage >= 0 && activity_.id == shown->title_id;
+        const bool choices = shown && !single_game_.empty() && shown->base_known &&
+                             !offer(*shown).busy && single_rows(*shown).size() > 2;
+        const float target = stages || choices ? 1.0f : 0.0f;
         grow_ = settings_.reduce_motion ? target
                                         : grow_ + (target - grow_) * std::min(1.0f, dt * 7.0f);
     }
@@ -2256,7 +2263,7 @@ void Screen::open_game_settings(const App &app, ui::Feedback &feedback)
         for (const auto &app : apps_)
             if (app.title_id == game_sheet_id_ && app.game_installed)
             {
-                // Repair: the install made again from the base copy (the Xbox 360 look on or
+                // Repair: the install made again from the base copy (the plan's option on or
                 // off is asked then).
                 ui::draw_button(canvas.list, canvas.fonts, ui::GlyphStyle::dark(), ui::Button::square,
                                 area.x + 16.0f, below + 4.0f, 30);
@@ -2596,9 +2603,9 @@ Screen::Offer Screen::offer(const App &app) const
             // A copy a release behind is brought up to date by its upgrade file as it installs.
             out.primary = Order::Kind::install_game;
             out.label = app.game_installed ? "Repair" : "Install";
-            if (!single_game_.empty() && app.game_installed && !single_x360_changes(app))
+            if (!single_game_.empty() && app.game_installed && !single_options_change(app))
             {
-                // Its own app: playing is the thing to do, unless the 360 look was changed.
+                // Its own app: playing is the thing to do, unless an option was changed.
                 out.primary = Order::Kind::play;
                 out.label = "Play";
             }
@@ -3011,6 +3018,38 @@ void Screen::draw_game_stages(const ui::Fonts &fonts, gfx::DrawList &list, const
     }
 }
 
+bool Screen::single_options_change(const App &app) const
+{
+    for (const auto &chosen : single_options_)
+        for (const auto &installed : app.game_options)
+            if (installed.id == chosen.id && installed.on != chosen.on)
+                return true;
+    return false;
+}
+
+std::vector<std::string> Screen::single_chosen() const
+{
+    std::vector<std::string> ids;
+    for (const auto &option : single_options_)
+        if (option.on)
+            ids.push_back(option.id);
+    return ids;
+}
+
+std::vector<Screen::SingleRow> Screen::single_rows(const App &) const
+{
+    std::vector<SingleRow> rows;
+    for (const auto &option : single_options_)
+        rows.push_back({option.title, {"Off", "On"}, option.on ? 1 : 0, option.description});
+    return rows;
+}
+
+void Screen::single_choose(const App &, int row, int value)
+{
+    if (row >= 0 && row < static_cast<int>(single_options_.size()))
+        single_options_[static_cast<std::size_t>(row)].on = value == 1;
+}
+
 void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, const Rect &box,
                                const App &app, const Offer &state) const
 {
@@ -3021,45 +3060,38 @@ void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, cons
     ui::text(list, fonts.regular, fonts.regular.font->fit(state.note, 20, w), cx, box.y + 138.0f, 20,
              kInk.with_alpha(0.66f), gfx::Align::center);
     // The choices, each a row of segments; the D-pad's row is lit.
-    struct Row
-    {
-        const char *name;
-        std::vector<const char *> values;
-        int value;
-    };
-    std::vector<Row> rows;
-    if (!app.game_options.empty())
-        rows.push_back({"Xbox 360 look", {"Off", "On  \xC2\xB7  +3.7 GB"}, std::max(single_x360_, 0)});
-    float y = box.y + 186.0f;
+    const auto rows = single_rows(app);
+    const int lit_row = std::clamp(single_row_, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+    float y = box.y + 176.0f;
     for (std::size_t r = 0; r < rows.size(); ++r)
     {
-        const bool lit = true; // the page's one choice, always the D-pad's
-        list.bordered_rect({x - 14.0f, y, w + 28.0f, 104.0f}, 20, kInk.with_alpha(0.06f), 1.5f,
+        const bool lit = static_cast<int>(r) == lit_row;
+        if (lit)
+            list.bordered_rect({x - 14.0f, y, w + 28.0f, 92.0f}, 20, kInk.with_alpha(0.06f), 1.5f,
                                kAccent.with_alpha(0.55f));
-        ui::text(list, fonts.semibold, ui::upper(rows[r].name), x, y + 32.0f, 15,
-                 kInk.with_alpha(lit ? 0.8f : 0.5f), gfx::Align::left, 3.0f);
+        ui::text(list, fonts.semibold, fonts.semibold.font->fit(ui::upper(rows[r].name), 15, w), x,
+                 y + 28.0f, 15, kInk.with_alpha(lit ? 0.8f : 0.5f), gfx::Align::left, 3.0f);
         const auto count = static_cast<float>(rows[r].values.size());
         const float width = (w - 8.0f * (count - 1.0f)) / count;
         for (std::size_t i = 0; i < rows[r].values.size(); ++i)
         {
-            const Rect segment{x + (width + 8.0f) * static_cast<float>(i), y + 46.0f, width, 44.0f};
+            const Rect segment{x + (width + 8.0f) * static_cast<float>(i), y + 40.0f, width, 40.0f};
             const bool chosen = static_cast<int>(i) == rows[r].value;
             if (chosen)
-                list.rounded_rect(segment, 22, lit ? kAccent : kInk.with_alpha(0.2f));
+                list.rounded_rect(segment, 20, lit ? kAccent : kInk.with_alpha(0.2f));
             else
-                list.bordered_rect(segment, 22, kClear, 1.5f, kInk.with_alpha(0.2f));
-            ui::text(list, fonts.semibold, fonts.semibold.font->fit(rows[r].values[i], 19, width - 16.0f),
-                     segment.cx(), centred(segment.cy(), 19), 19,
+                list.bordered_rect(segment, 20, kClear, 1.5f, kInk.with_alpha(0.2f));
+            ui::text(list, fonts.semibold, fonts.semibold.font->fit(rows[r].values[i], 18, width - 16.0f),
+                     segment.cx(), centred(segment.cy(), 18), 18,
                      chosen && lit ? kOnAccent : kInk.with_alpha(chosen ? 0.95f : 0.62f),
                      gfx::Align::center);
         }
-        y += 112.0f;
+        y += 100.0f;
     }
-    // The rest is in the game itself.
-    ui::paragraph(list, fonts.regular,
-                  "Performance overlay, repair and the Xbox 360 look later: in the game, Options, "
-                  "PS5 Options.",
-                  x, y + 22.0f, 18, w, 26, kInk.with_alpha(0.55f), 2);
+    // What the lit row does.
+    if (!rows.empty())
+        ui::paragraph(list, fonts.regular, rows[static_cast<std::size_t>(lit_row)].about, x, y + 18.0f,
+                      18, w, 26, kInk.with_alpha(0.55f), 2);
 }
 
 void Screen::draw_page(const ui::Fonts &fonts, std::uint32_t glass)

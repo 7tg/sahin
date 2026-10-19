@@ -127,7 +127,7 @@ struct InGame
 {
     std::optional<library::Overlay> overlay;
     std::optional<library::Cursor> cursor;
-    int x360 = -1; // the Xbox 360 option: -1 unsaid, 0 off, 1 on
+    std::map<std::string, bool> options; // the plan's options it named (option.<id>=on|off)
     bool repair = false, setup = false;
 };
 
@@ -419,12 +419,21 @@ class Screen
     // A game's own app at rest: what it is, and its choices on the page itself (one layer).
     void draw_single_setup(const hui::ui::Fonts &fonts, hui::gfx::DrawList &list,
                            const hui::gfx::Rect &box, const App &app, const Offer &state) const;
-    // The Xbox 360 look chosen on the page differs from the install's: Cross repairs.
-    bool single_x360_changes(const App &app) const
+    // The plan's options chosen on the page differ from the install's: Cross repairs.
+    bool single_options_change(const App &app) const;
+    // The ids of the options switched on on the page, for an install.
+    std::vector<std::string> single_chosen() const;
+    // The page's rows of choices (a game's own app), the D-pad's row lit.
+    struct SingleRow
     {
-        return single_x360_ >= 0 && !app.game_options.empty() &&
-               (single_x360_ == 1) != app.game_options.front().on;
-    }
+        std::string name;
+        std::vector<std::string> values;
+        int value = 0;
+        std::string about; // shown under the rows while the row is lit
+    };
+    std::vector<SingleRow> single_rows(const App &app) const;
+    // Row row set to value (left and right on the page).
+    void single_choose(const App &app, int row, int value);
 
     hui::ui::Theme theme_;
     std::string theme_id_;       // whose colours the interface is wearing or easing toward
@@ -441,7 +450,9 @@ class Screen
     std::string single_game_;
     bool single_opened_ = false;
     std::optional<InGame> ingame_;
-    int single_x360_ = -1; // the Xbox 360 look chosen on the page; -1 until the install is known
+    // The plan's options as chosen on the page; empty until the install is known.
+    std::vector<library::OptionView> single_options_;
+    int single_row_ = 0; // the page's row the D-pad is on
     bool play_after_ = false; // the in-game choices' job, then the game
     void open_game_settings(const App &app, hui::ui::Feedback &feedback);
     Activity activity_;

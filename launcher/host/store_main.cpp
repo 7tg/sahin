@@ -506,13 +506,14 @@ int main(int argc, char **argv)
                 screen.set_running(mode == "mw-busy" ? std::vector<std::string>{"PPSA99404"}
                                                      : std::vector<std::string>{},
                                    true);
-                // The plan's option, as the Service publishes it.
+                // The plan's options, as the Service publishes them.
                 screen.set_base("PPSA99404", base,
                                 mode == "mw-installed" || mode.starts_with("mw-solo-installed"),
-                                {{"x360", "Xbox 360 graphics",
-                                  "The Xbox 360 look: the X360 Stuff Pack 4.2, the converted Xbox 360 "
-                                  "movies, HD Content Support, Front-End Shadows, HD Reflections, "
-                                  "native D3DX and an async-luminance fix. About 3.7 GB more to download.",
+                                {{"online", "Online through Amax",
+                                  "Multiplayer on the Amax community servers (amax-emu.com).", true},
+                                 {"amax-client", "Amax client extras",
+                                  "Amax's client: profile pictures, its Lua plugins and a 60 fps "
+                                  "race cap.",
                                   false}});
                 if (mode.starts_with("mw-solo"))
                 {
@@ -547,9 +548,11 @@ int main(int argc, char **argv)
                     screen.update(pick, 1.0f / 60.0f, feedback);
                     settle(40);
                 }
-                else if (mode == "mw-solo-installed-x360")
+                else if (mode == "mw-solo-installed-options")
                 {
-                    // A game's own app: the 360 look switched on, so Cross repairs.
+                    // A game's own app: the Amax client switched on, so Cross repairs.
+                    screen.update(down, 1.0f / 60.0f, feedback);
+                    settle(8);
                     screen.update(right, 1.0f / 60.0f, feedback);
                     settle(30);
                 }
@@ -558,7 +561,7 @@ int main(int argc, char **argv)
                     // Downloading, the first stage, the box grown.
                     screen.set_activity({"PPSA99404", 1, 640u << 20, 1495u << 20, {}, 1,
                                          {"Copied to the console; the USB drive can go",
-                                          "Getting Xbox 360 Stuff Pack 4.2 (9 of 14)"}, 0.31f});
+                                          "Getting Amax client 0.0.0.7 (2 of 3)"}, 0.31f});
                     settle(60);
                 }
                 else if (mode == "mw-installing-files")
