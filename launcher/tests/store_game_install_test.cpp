@@ -178,12 +178,12 @@ int main()
         " \"dll_overrides\": \"dinput8=n,b\", \"width\": 1920, \"height\": 1080,"
         " \"runtime\": {\"fast_clock\": \"true\"}, \"after\": \"other.profile\"},"
         " \"upgrades\": [{\"from\": \"1.0\", \"source\": \"up\"}],"
-        " \"strip\": [\"dsound.dll\", \"scripts\"],"
+        " \"strip\": [\"dsound.dll\", \"scripts\", \"amax\"],"
         " \"pending\": [\"A mod with no source yet\"]}";
     InstallPlan plan;
     assert(parse_plan(plan_text, plan, error));
     assert(plan.pending.size() == 1 && plan.source("mods")->url == "https://example.com/mods.zip");
-    assert(plan.strip.size() == 2 && plan.strip[1] == "scripts");
+    assert(plan.strip.size() == 3 && plan.strip[1] == "scripts");
 
     // Plans that would write outside their folders, or name what isn't there, are refused.
     const auto refused = [&](std::string from, std::string to)
@@ -311,11 +311,14 @@ int main()
     // strip list, in any case), and the copy itself stays as it is.
     put(base / "Dsound.dll", "old mod loader");
     put(base / "scripts" / "a.asi", "old plugin");
+    put(base / "AMAX" / "x" / "y.dll", "old client"); // a folder, in other case, with a subfolder
     assert(install_game(plan, game, paths, options, progress, go, error));
     assert(!fs::exists(installed / "dsound.dll") && !fs::exists(installed / "Dsound.dll"));
     assert(!fs::exists(installed / "scripts" / "a.asi") &&
            read(installed / "scripts" / "Mod.asi") == asi); // the plan's own scripts are there
     assert(read(base / "scripts" / "a.asi") == "old plugin" && read(base / "Dsound.dll") == "old mod loader");
+    assert(!spelled(installed, "AMAX") && !fs::exists(installed / "amax") && read(base / "AMAX" / "x" / "y.dll") == "old client");
+    fs::remove_all(base / "AMAX");
     fs::remove(base / "Dsound.dll");
     fs::remove_all(base / "scripts");
 

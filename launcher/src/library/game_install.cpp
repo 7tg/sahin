@@ -737,8 +737,11 @@ bool install_game(const InstallPlan &given, const Manifest &manifest, const Inst
     };
     // What earlier mod installs left in the copy goes: the plan adds its own.
     for (const auto &relative : plan.strip)
-        if (const auto found = find_entry(work, relative); !found.empty())
-            remove_all(found);
+        if (const auto found = find_entry(work, relative); !found.empty() && !remove_all(found))
+        {
+            error = "Can't remove " + found + " from the copy";
+            return fail();
+        }
     if (!upgrade.empty())
     {
         step("Upgrading to " + plan.release);
@@ -753,7 +756,7 @@ bool install_game(const InstallPlan &given, const Manifest &manifest, const Inst
             return fail();
         }
     }
-    // In bytes: the Xbox 360 zips are gigabytes each, so a count of files would sit still.
+    // In bytes: the big files are hundreds of megabytes each, so a count of files would sit still.
     std::uint64_t adding = 0;
     for (const auto &placement : plan.game_files)
         adding += placement_bytes(placement, files[placement.source]);
