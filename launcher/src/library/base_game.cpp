@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <sys/stat.h>
+#include <cctype>
 #include <unistd.h>
 
 namespace store::library
@@ -260,8 +261,12 @@ BaseGame locate(const std::string &data_root, std::span<const std::string> roots
         }
     BaseGame absent;
     absent.path = base;
-    absent.detail = "Put a clean install in " + base + " over FTP, or on a USB drive in a folder "
-                    "named " + manifest.folder + ".";
+    // The folder's name as people write it (BLUR: Blur); any case is found.
+    std::string shown = manifest.folder;
+    for (std::size_t i = 1; i < shown.size(); i++)
+        shown[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(shown[i])));
+    absent.detail = "Put a clean install in " + data_root + "/base-games/" + shown +
+                    " over FTP, or on a USB drive in a folder named " + shown + " (any case).";
     return absent;
 }
 

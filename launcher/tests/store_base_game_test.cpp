@@ -53,7 +53,8 @@ int main()
     fs::create_directories(data);
     const std::vector<std::string> roots{usb.string()};
     auto found = locate(data.string(), roots, game);
-    assert(found.state == State::absent && found.detail.find("base-games/GAME") != std::string::npos);
+    assert(found.state == State::absent && found.detail.find("base-games/Game ") != std::string::npos &&
+           found.detail.find("named Game (any case)") != std::string::npos);
 
     // On USB, its names in any case: found there, the older release, to be patched.
     put(usb / "game" / "Game.EXE", "exe");
