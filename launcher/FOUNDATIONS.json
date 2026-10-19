@@ -508,7 +508,7 @@
       "third_party/stb/UPSTREAM": "eb56a6230086b3837a77ee0d347136870efec58a28ca686c66f3f2b54baab742",
       "third_party/stb/stb_image_write.h": "cbd5f0ad7a9cf4468affb36354a1d2338034f2c12473cf1a8e32053cb6914a05",
       "third_party/stb/stb_truetype.h": "ecd30b05e0dd4fea3a13c26810dd9e1992dc379049482c393d5a19e6b5090aab",
-      "tools/fetch-opengl-sdk.sh": "9044a4c08b98318a0af26608f3cec01b7463645e3db3b16d27e1a81553bcd02e",
+      "tools/fetch-opengl-sdk.sh": "cd654b1fe8d12645bcd1c939a931acc3e5a2b2fae31c7bf7e9724408236b6c4e",
       "tools/prepare-opengl.sh": "ddf2c8680418ef525d0170a1e154d28b7b186178ff18f212ec9bc267400094db",
       "src/core/image.cpp": "d34bde4d2d46df23d9f40598dce61aeb6f147ecedf77e9a6457b6a5eaa6f4af4",
       "src/core/image.hpp": "ffb5586197d5bccb8b77c6d005c621c8aa7f8386d29395cae842924fc0d4bd91",

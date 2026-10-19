@@ -18,8 +18,8 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 version=0.6.0-31-gb696cd3
 commit=b696cd39d63a4e346da3c680a31238b41ae359a8
-archive_sha256=PENDING
-manifest_sha256=PENDING
+archive_sha256=659776cf824da758d048de6339101fb7002f3abc70efddc5ad2f85ea09ce5c40
+manifest_sha256=22acd4607ec796381fe7e1bf93b858c5f276caab53bcc9146d1091f2da5256e3
 
 cache="$root/.deps/ps5-opengl"
 archive="$cache/ps5-opengl-sdk-$version.tar.gz"
