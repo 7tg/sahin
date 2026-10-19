@@ -44,8 +44,8 @@ AMAX_CLIENT = [
     {"source": "amax-client", "member": "d3d9.dll", "to": "d3d9.dll"},
     {"source": "amax-client", "member": "lua5.1.dll", "to": "lua5.1.dll"},
     {"source": "amax-client", "member": "discord-rpc.dll", "to": "discord-rpc.dll"},
-    # TODO(Task 15): amax/dxvk.dll from the bundled DXVK 32-bit d3d9.dll (the d3d9.dll
-    # proxy above hands off to it), once the bundled source has a name.
+    # No amax/dxvk.dll: without it the d3d9.dll proxy above hands off to system32's
+    # d3d9.dll, which in the bare prefix is our DXVK already.
 ]
 
 

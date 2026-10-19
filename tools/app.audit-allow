@@ -1,0 +1,5 @@
+# PE files in the app (release/PPSA99404) built from source by tools/build.sh; tools/build.sh
+# audit copies this list into the app folder as .audit-allow while it audits, then removes it.
+# Wine's Windows modules (host Wine and Wine's PS5 modules, wowprospero, wow64native):
+win/wine/lib/wine/i386-windows/*
+win/wine/lib/wine/x86_64-windows/*
