@@ -32,7 +32,7 @@ EA art and music, the Xbox 360 tooling, the PS5 Options mod and the retired mods
 | --- | --- |
 | `tools/` | the build (`build.sh`, pinned container), prefix maker, bundle and app-zip tools, forked from nfs-blackbox-ps5 and stripped of NFS steps |
 | `patches/` | the prospero-win, PS5_Mesa, PS5_Vulkan and DXVK patches, carried over unchanged (they are not game-specific) |
-| `launcher/` | the forked launcher (C++20, ps5-native-app-boilerplate): paths `/data/nfs-blackbox` → `/data/sahin`, prefix `sahin`, a one-game catalog, the base-game check moved from the C++ `kManifests` table into the JSON plan, an options list instead of the single Xbox 360 option |
+| `launcher/` | the forked launcher (C++20, ps5-native-app-boilerplate): paths `/data/nfs-blackbox` → `/data/sahin`, prefix `sahin`, a one-game catalog, a Blur entry in the C++ `kManifests` table (with two new switches: mod files are left out instead of refused, an unknown data hash is a warning), a plan `strip` list, an options list instead of the single Xbox 360 option |
 | `profile/blur/` | `make-blur-plan.py` (plan generator), our config files (`amax-redirect.cfg`, `dxvk.conf`), registry text, the known-good data hashes |
 | `art/` | `make-art.py`, which generates the icon, the Home background and pic0 (neon streaks) |
 | submodules | prospero-win, PS5_Mesa, PS5_Vulkan, PS5_PayloadSDK, ps5-native-app-boilerplate, at the commits nfs-blackbox-ps5 pins |
@@ -43,7 +43,7 @@ Upstream fixes to the NFS repos are applied by hand when they matter.
 
 1. The user puts their Blur folder in `/data/sahin/base-games/Blur` over FTP, or on a USB
    drive as `Blur`. A USB copy is imported to the console first.
-2. **Copy check** (driven by the plan's `base` section):
+2. **Copy check** (the launcher's Blur `Manifest`):
    - Required, case-insensitive: `Blur.exe`, `binkw32.dll`, `cache/` with its `.pak` and
      `.sig` files, `levels/`, `UI/movies/`.
    - Data files with a known hash are compared; an unknown hash is a warning on the page, not
