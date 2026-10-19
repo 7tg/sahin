@@ -2,7 +2,7 @@
 """Zip a game's own app folder the same way every time: the release asset the homebrew catalog
 installs (its <TITLEID>/ folder at the top, under 2 GiB).
 
-Entries sorted, fixed times (2026-01-01), deflated, no links or .DS_Store; the same folder
+Entries sorted, fixed times (2026-01-01), deflated, mode 0777, no links or .DS_Store; the same folder
 gives the same bytes on any machine (the zips tools/make-bundle.py makes are made this way).
 
   tools/make-app-zip.py release/game-apps/PPSA99404 release/game-apps/PPSA99404.zip
@@ -26,7 +26,13 @@ with zipfile.ZipFile(out + '.part', 'w', allowZip64=True) as z:
     for name in sorted(names):
         info = zipfile.ZipInfo(tid + '/' + name.replace(os.sep, '/'), (2026, 1, 1, 0, 0, 0))
         info.compress_type = zipfile.ZIP_DEFLATED
-        info.external_attr = 0o100644 << 16
+        # Every entry 0777, as the launcher's GNUmakefile release-zip (store-zip-modes.py) stores
+        # them: the console starts only an app whose files are open to all, and a tool that
+        # keeps the archive's modes (on the console, rsync/scp) would otherwise leave 0644 files
+        # (CE-107750-0) and an eboot.bin, game.bin and PRXs without the execute bit
+        # prospero-win's package_release.sh gives them.
+        info.create_system = 3  # Unix: the high half of external_attr is the mode
+        info.external_attr = 0o100777 << 16
         with open(os.path.join(app, name), 'rb') as f, z.open(info, 'w', force_zip64=True) as w:
             shutil.copyfileobj(f, w, 1 << 20)
 os.replace(out + '.part', out)
