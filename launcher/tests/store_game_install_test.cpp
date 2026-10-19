@@ -446,6 +446,31 @@ int main()
         assert(read(win / "profiles" / "the-game.profile").find("env = DXVK_HUD=fps,frametimes") != std::string::npos);
     }
 
+    // The picture size (the page's Resolution) goes into the profile; unset, the plan's.
+    {
+        InstallOptions sized = options;
+        sized.width = 1920;
+        sized.height = 1080;
+        auto big = plan;
+        big.profile.width = 3840;
+        big.profile.height = 2160;
+        assert(effective_plan(big, options).profile.width == 3840 &&
+               effective_plan(big, options).profile.height == 2160);
+        const auto chosen = effective_plan(big, sized).profile;
+        assert(chosen.width == 1920 && chosen.height == 1080);
+        assert(install_game(big, game, paths, sized, progress, go, error));
+        assert(read(win / "profiles" / "the-game.profile").find("desktop = 1920x1080") != std::string::npos);
+        sized.width = 2560;
+        sized.height = 1440;
+        assert(install_game(big, game, paths, sized, progress, go, error));
+        assert(read(win / "profiles" / "the-game.profile").find("desktop = 2560x1440") != std::string::npos);
+        assert(install_game(big, game, paths, options, progress, go, error));
+        assert(read(win / "profiles" / "the-game.profile").find("desktop = 3840x2160") != std::string::npos);
+        assert(resolution_named(resolution_name({2560, 1440})).width == 2560 &&
+               resolution_named("2560x1440").height == 1440 && resolution_named("800x600").width == 0 &&
+               resolution_named("").width == 0);
+    }
+
     // The touchpad as the mouse (the default now): the plan's touchpad ini edits after its
     // own, and the profile's input; off, neither.
     {

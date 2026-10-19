@@ -496,6 +496,11 @@ InstallPlan effective_plan(const InstallPlan &plan, const InstallOptions &option
         out.profile.touchpad_mouse = true;
     }
     out.touchpad_ini.clear();
+    if (options.width != 0 && options.height != 0)
+    {
+        out.profile.width = options.width;
+        out.profile.height = options.height;
+    }
     if (options.overlay == Overlay::fps)
         out.profile.show_fps = true;
     else if (options.overlay == Overlay::full)
@@ -511,6 +516,21 @@ const char *overlay_name(Overlay overlay)
 Overlay overlay_named(std::string_view name)
 {
     return name == "fps" ? Overlay::fps : name == "full" ? Overlay::full : Overlay::off;
+}
+
+std::string resolution_name(Resolution resolution)
+{
+    if (resolution.width == 0 || resolution.height == 0)
+        return {};
+    return std::to_string(resolution.width) + "x" + std::to_string(resolution.height);
+}
+
+Resolution resolution_named(std::string_view name)
+{
+    for (const auto &known : kResolutions)
+        if (name == resolution_name(known))
+            return known;
+    return {};
 }
 
 const char *cursor_name(Cursor cursor)

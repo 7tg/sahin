@@ -1317,7 +1317,17 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
         feedback.play(audio::Cue::back);
     }
     else if (input.is_pressed(Action::north) && !single_game_.empty())
-        return; // its choices are on the page
+    {
+        // A game's own app: its choices are on the page; Triangle repairs an installed game.
+        if (shown.game_installed && state.armed && !state.busy)
+        {
+            press_.trigger();
+            feedback.play(audio::Cue::select);
+            order(shown, Order::Kind::install_game, single_chosen());
+        }
+        else
+            feedback.play(audio::Cue::error);
+    }
     else if (input.is_pressed(Action::north) && shown.base_known)
         open_game_settings(shown, feedback);
     else if (input.is_pressed(Action::north))
@@ -2299,6 +2309,8 @@ void Screen::order(const App &app, Order::Kind kind, std::vector<std::string> op
         pending_order.overlay = known->second;
     if (const auto known = settings_.cursors.find(app.title_id); known != settings_.cursors.end())
         pending_order.cursor = known->second;
+    if (const auto known = settings_.resolutions.find(app.title_id); known != settings_.resolutions.end())
+        pending_order.resolution = known->second;
     // A collection game's uninstall (the hold under Repair) removes it from its prefix.
     if (kind == Order::Kind::uninstall && app.base_known)
         kind = Order::Kind::uninstall_game;
@@ -2627,7 +2639,7 @@ Screen::Offer Screen::offer(const App &app) const
             {
                 out.armed = true;
                 out.reason = out.primary == Order::Kind::play
-                                 ? "Settings are in the game: Options, PS5 Options."
+                                 ? "Hold Square as Sahin starts to come back to this page."
                              : base.on_usb
                                  ? "Copies your game from the USB drive to the console first. "
                                    "The USB copy is left as it is."
@@ -3036,18 +3048,51 @@ std::vector<std::string> Screen::single_chosen() const
     return ids;
 }
 
-std::vector<Screen::SingleRow> Screen::single_rows(const App &) const
+std::vector<Screen::SingleRow> Screen::single_rows(const App &app) const
 {
     std::vector<SingleRow> rows;
     for (const auto &option : single_options_)
         rows.push_back({option.title, {"Off", "On"}, option.on ? 1 : 0, option.description});
+    // The game's settings, kept at once (and written into an installed game's profile).
+    SingleRow resolution{"Resolution", {}, 0,
+                         "The picture the game draws. Lower is lighter on the console."};
+    const auto known = settings_.resolutions.find(app.title_id);
+    for (std::size_t i = 0; i < std::size(library::kResolutions); ++i)
+    {
+        const auto &size = library::kResolutions[i];
+        resolution.values.push_back(std::to_string(size.width) + "\xC3\x97" + std::to_string(size.height));
+        if (known != settings_.resolutions.end() && known->second.width == size.width &&
+            known->second.height == size.height)
+            resolution.value = static_cast<int>(i);
+    }
+    rows.push_back(std::move(resolution));
+    const auto overlay = settings_.overlays.find(app.title_id);
+    rows.push_back({"Performance overlay",
+                    {"Off", "Frame rate", "Full"},
+                    static_cast<int>(overlay == settings_.overlays.end() ? library::Overlay::off
+                                                                         : overlay->second),
+                    "Frame rate: a counter in the corner. Full: DXVK's frame times, GPU load and "
+                    "draw calls."});
     return rows;
 }
 
-void Screen::single_choose(const App &, int row, int value)
+void Screen::single_choose(const App &app, int row, int value)
 {
-    if (row >= 0 && row < static_cast<int>(single_options_.size()))
+    const int options = static_cast<int>(single_options_.size());
+    if (row >= 0 && row < options)
+    {
         single_options_[static_cast<std::size_t>(row)].on = value == 1;
+        return; // applied by Cross: a repair
+    }
+    if (row == options && value >= 0 && value < static_cast<int>(std::size(library::kResolutions)))
+        settings_.resolutions[app.title_id] = library::kResolutions[value];
+    else if (row == options + 1 && value >= 0 && value <= static_cast<int>(library::Overlay::full))
+        settings_.overlays[app.title_id] = static_cast<library::Overlay>(value);
+    else
+        return;
+    settings_changed = true;
+    if (app.game_installed && installer_)
+        order(app, Order::Kind::game_settings); // the profile written again now
 }
 
 void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, const Rect &box,
@@ -3374,12 +3419,15 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
         detail[details++] = {ui::Button::cross, state.label.c_str()};
     if (state.uninstall && installer_ && guard_ && !state.busy)
         detail[details++] = {ui::Button::square, "Uninstall"};
-    if (!single_game_.empty() && focused() && focused()->base_known && !focused()->game_options.empty())
+    if (!single_game_.empty() && focused() && focused()->base_known && !state.busy)
         detail[details++] = {ui::Button::dpad, "Choose"};
     else if (single_game_.empty())
         detail[details++] = {ui::Button::dpad, "Scroll"};
-    // A game's own app has its choices on the page: no Triangle.
-    if (single_game_.empty() && focused() && focused()->base_known)
+    // A game's own app has its choices on the page; Triangle repairs it once installed.
+    if (!single_game_.empty() && focused() && focused()->game_installed && state.armed &&
+        state.primary == Order::Kind::play)
+        detail[details++] = {ui::Button::triangle, "Repair"};
+    else if (single_game_.empty() && focused() && focused()->base_known)
         detail[details++] = {ui::Button::triangle, "Game settings"};
     else if (single_game_.empty() && focused() && !focused()->local_only)
         detail[details++] = {ui::Button::triangle, "Refresh"};
@@ -3475,6 +3523,9 @@ std::string format_settings(const Settings &settings)
                for (const auto &[id, cursor] : settings.cursors)
                    if (cursor != library::Cursor::off)
                        out += "cursor." + id + "=" + library::cursor_name(cursor) + "\n";
+               for (const auto &[id, resolution] : settings.resolutions)
+                   if (const auto name = library::resolution_name(resolution); !name.empty())
+                       out += "resolution." + id + "=" + name + "\n";
                return out;
            }();
 }
@@ -3523,6 +3574,13 @@ Settings parse_settings(std::string_view text)
                  std::all_of(key.begin() + 7, key.end(),
                              [](char c) { return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'); }))
             settings.cursors[std::string(key.substr(7))] = library::cursor_named(value);
+        else if (key.starts_with("resolution.") && key.size() == 11 + 9 &&
+                 std::all_of(key.begin() + 11, key.end(),
+                             [](char c) { return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'); }))
+        {
+            if (const auto resolution = library::resolution_named(value); resolution.width != 0)
+                settings.resolutions[std::string(key.substr(11))] = resolution;
+        }
         else if (key == "catalog_url")
             catalog::normalize_api(value, settings.catalog_url);
         else if (key == "verify_signatures")

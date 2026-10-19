@@ -106,12 +106,14 @@ class Service
     bool request_game(const catalog::Entry &entry, bool remove, const std::string &location,
                       std::vector<std::string> options = {},
                       library::Overlay overlay = library::Overlay::off,
-                      library::Cursor cursor = library::Cursor::touchpad);
-    // An installed game's settings (its performance overlay and cursor) written into its
+                      library::Cursor cursor = library::Cursor::touchpad,
+                      library::Resolution resolution = {});
+    // An installed game's settings (its performance overlay, cursor and picture size) written into its
     // profile and ini files now; nothing to do for a game that isn't installed (its next
     // install takes them).
     bool request_game_settings(const catalog::Entry &entry, library::Overlay overlay,
-                               library::Cursor cursor = library::Cursor::touchpad);
+                               library::Cursor cursor = library::Cursor::touchpad,
+                               library::Resolution resolution = {});
     // Set before start(): where the games' install plans are (<plans>/<folder>.json),
     // prospero-win's data, and the prefix games go into ("" for each plan's own; a test
     // prefix keeps a test install apart from the live one, its profile named after it).
@@ -155,6 +157,7 @@ class Service
         std::vector<std::string> options; // install_game: the plan's options chosen
         library::Overlay overlay = library::Overlay::off; // install_game, game_settings
         library::Cursor cursor = library::Cursor::touchpad;    // install_game, game_settings
+        library::Resolution resolution = {};                   // install_game, game_settings
     };
     static void *entry(void *self);
     static void *icon_entry(void *self);
@@ -202,10 +205,10 @@ class Service
     bool import_job(const catalog::Entry &entry, std::string &error);
     bool game_job(const catalog::Entry &entry, bool remove, const std::string &location,
                   const std::vector<std::string> &chosen, library::Overlay overlay,
-                  library::Cursor cursor, const install::Environment &environment,
-                  std::string &error);
+                  library::Cursor cursor, library::Resolution resolution,
+                  const install::Environment &environment, std::string &error);
     bool settings_job(const catalog::Entry &entry, library::Overlay overlay, library::Cursor cursor,
-                      std::string &error);
+                      library::Resolution resolution, std::string &error);
     bool home_app(const catalog::Entry &game, const std::string &location,
                   const install::Environment &environment, std::string &error);
     bool remove_home_app(const std::string &id, const std::string &location,

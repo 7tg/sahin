@@ -43,6 +43,16 @@ enum class Cursor
 const char *cursor_name(Cursor cursor); // "off", "touchpad"
 Cursor cursor_named(std::string_view name); // anything else is off
 
+// The picture size a game starts with (the page's Resolution): the profile's desktop. Zero is
+// the plan's own. Only these are offered.
+struct Resolution
+{
+    unsigned width = 0, height = 0;
+};
+inline constexpr Resolution kResolutions[] = {{3840, 2160}, {2560, 1440}, {1920, 1080}};
+std::string resolution_name(Resolution resolution); // "3840x2160"; "" for the plan's
+Resolution resolution_named(std::string_view name); // one of kResolutions, else the plan's
+
 struct InstallOptions
 {
     std::time_t now = 0;      // stamps the registry keys it adds and the record
@@ -54,6 +64,7 @@ struct InstallOptions
     std::string profile_name;
     std::vector<std::string> chosen; // the plan's options to add (ids); unknown ones are ignored
     Overlay overlay = Overlay::off;  // written into the profile
+    unsigned width = 0, height = 0;  // the profile's picture size; 0: the plan's
     // The profile's input and the plan's touchpad ini edits. Touchpad is how the games run
     // now: with the cursor hidden (Off) Windows' cursor still showed in cutscenes (owner,
     // 2026-10-18), so Off is no longer offered.

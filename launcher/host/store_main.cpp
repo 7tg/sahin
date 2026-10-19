@@ -556,6 +556,25 @@ int main(int argc, char **argv)
                     screen.update(right, 1.0f / 60.0f, feedback);
                     settle(30);
                 }
+                else if (mode == "mw-solo-installed-resolution")
+                {
+                    // A game's own app: 2560x1440 picked, kept at once; Cross still plays.
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        screen.update(down, 1.0f / 60.0f, feedback);
+                        settle(8);
+                    }
+                    screen.update(right, 1.0f / 60.0f, feedback);
+                    settle(30);
+                    const auto kept = screen.settings().resolutions.find("PPSA99404");
+                    assert(kept != screen.settings().resolutions.end() && kept->second.width == 2560 &&
+                           screen.settings_changed &&
+                           screen.pending_order.kind == store::Order::Kind::game_settings &&
+                           screen.pending_order.resolution.height == 1440);
+                    assert(store::parse_settings(store::format_settings(screen.settings()))
+                               .resolutions.at("PPSA99404")
+                               .width == 2560);
+                }
                 else if (mode == "mw-installing" || mode == "mw-solo-installing")
                 {
                     // Downloading, the first stage, the box grown.

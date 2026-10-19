@@ -350,22 +350,23 @@ bool Service::request_import(const catalog::Entry &entry)
 
 bool Service::request_game(const catalog::Entry &entry, bool remove, const std::string &location,
                            std::vector<std::string> options, library::Overlay overlay,
-                           library::Cursor cursor)
+                           library::Cursor cursor, library::Resolution resolution)
 {
     return enqueue({remove ? Job::Kind::uninstall_game : Job::Kind::install_game, entry, location,
-                    std::move(options), overlay, cursor});
+                    std::move(options), overlay, cursor, resolution});
 }
 
 bool Service::request_game_settings(const catalog::Entry &entry, library::Overlay overlay,
-                                    library::Cursor cursor)
+                                    library::Cursor cursor, library::Resolution resolution)
 {
-    return enqueue({Job::Kind::game_settings, entry, {}, {}, overlay, cursor});
+    return enqueue({Job::Kind::game_settings, entry, {}, {}, overlay, cursor, resolution});
 }
 
 // An installed game's profile written again with its settings, and the plan's options its
 // install chose (from the record), so nothing else in it changes.
 bool Service::settings_job(const catalog::Entry &entry, library::Overlay overlay,
-                           library::Cursor cursor, std::string &error)
+                           library::Cursor cursor, library::Resolution resolution,
+                           std::string &error)
 {
     library::InstallPlan plan;
     const library::Manifest *manifest = nullptr;
@@ -374,6 +375,8 @@ bool Service::settings_job(const catalog::Entry &entry, library::Overlay overlay
         return false;
     options.overlay = overlay;
     options.cursor = cursor;
+    options.width = resolution.width;
+    options.height = resolution.height;
     const library::InstallPaths paths{root_, win_root};
     if (access(library::record_path(library::effective_plan(plan, options), paths).c_str(), F_OK) != 0)
         return true; // not installed: its next install writes the profile with them
@@ -478,8 +481,8 @@ bool Service::remove_home_app(const std::string &id, const std::string &location
 // Home app, or both removed, with the job's progress.
 bool Service::game_job(const catalog::Entry &entry, bool remove, const std::string &location,
                        const std::vector<std::string> &chosen, library::Overlay overlay,
-                       library::Cursor cursor, const install::Environment &environment,
-                       std::string &error)
+                       library::Cursor cursor, library::Resolution resolution,
+                       const install::Environment &environment, std::string &error)
 {
     library::InstallPlan plan;
     const library::Manifest *manifest = nullptr;
@@ -489,6 +492,8 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
     options.chosen = chosen;
     options.overlay = overlay;
     options.cursor = cursor;
+    options.width = resolution.width;
+    options.height = resolution.height;
     const library::InstallPaths paths{root_, win_root};
     bases_stale_ = true;
     if (remove)
@@ -1182,12 +1187,12 @@ void Service::run_installer()
             const bool remove = job.kind == Job::Kind::uninstall_game;
             result.operation = remove ? "game-uninstall" : "game-install";
             result.ok = game_job(job.entry, remove, job.location, job.options, job.overlay,
-                                 job.cursor, environment, result.error);
+                                 job.cursor, job.resolution, environment, result.error);
         }
         else if (job.kind == Job::Kind::game_settings)
         {
             result.operation = "game-settings";
-            result.ok = settings_job(job.entry, job.overlay, job.cursor, result.error);
+            result.ok = settings_job(job.entry, job.overlay, job.cursor, job.resolution, result.error);
         }
 #ifdef STORE_FILE_WORKER
         else if (job.entry.id == environment.self)

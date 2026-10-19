@@ -128,6 +128,40 @@ std::optional<store::InGame> take_ingame_choices(const std::string &storage_root
     return choices;
 }
 
+// Square held as the app starts: its page instead of the game (settings, repair). A pad that
+// can't be read, or reads nothing within a moment, starts the game: nothing waits on it.
+bool square_held()
+{
+    hui::ps5::Pad pad;
+    if (!pad.open())
+    {
+        hui::sys::log("[STORE] start: no controller to read, starting the game");
+        return false;
+    }
+    std::array<hui::PadSample, 64> samples{};
+    for (int attempt = 0; attempt < 10; ++attempt) // the first samples can lag the open
+    {
+        const auto count = pad.read(samples);
+        bool connected = false;
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            if (!samples[i].connected)
+                continue;
+            connected = true;
+            if ((samples[i].buttons & hui::pad_bits::kSquare) != 0)
+            {
+                hui::sys::log("[STORE] start: Square held, the page instead of the game");
+                return true;
+            }
+        }
+        if (connected)
+            return false;
+        hui::sys::sleep_us(20000);
+    }
+    hui::sys::log("[STORE] start: the controller said nothing, starting the game");
+    return false;
+}
+
 [[noreturn]] void play_single_game(const char *why)
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
@@ -237,11 +271,12 @@ int main()
     // Wherever the store is installed (system/app_folder.hpp), now that the root may have changed.
     const std::string app_root = store::system::app_folder();
     sys::log("[STORE] app folder=%s", app_root.c_str());
-    // A game's own app shows its screen only when the game isn't installed yet, or when the
-    // game's in-game menu left choices to apply (or asked for this screen); otherwise the
-    // tile goes straight into the game.
+    // A game's own app shows its screen only when the game isn't installed yet, when the
+    // game's in-game menu left choices to apply (or asked for this screen), or when Square is
+    // held as it starts; otherwise the tile goes straight into the game.
     const auto ingame = kSingleGame[0] && elevated ? take_ingame_choices(storage_root) : std::nullopt;
-    if (kSingleGame[0] && elevated && !ingame && single_game_installed(app_root, storage_root))
+    if (kSingleGame[0] && elevated && !ingame && single_game_installed(app_root, storage_root) &&
+        !square_held())
         play_single_game("installed");
     request_path = std::string(storage_root) + "/dev/request.txt";
     handled_path = std::string(storage_root) + "/handled.txt";
@@ -743,10 +778,10 @@ int main()
                                             order.entry,
                                             order.kind == store::Order::Kind::uninstall_game,
                                             order.location, order.options, order.overlay,
-                                            order.cursor)
+                                            order.cursor, order.resolution)
                                   : order.kind == store::Order::Kind::game_settings
                                       ? service.request_game_settings(order.entry, order.overlay,
-                                                                      order.cursor)
+                                                                      order.cursor, order.resolution)
                                   : order.kind == store::Order::Kind::uninstall
                                       ? service.request_uninstall(order.id, order.location)
                                       : service.cancel_job(order.id);

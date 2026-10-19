@@ -80,6 +80,7 @@ struct Order
     std::vector<std::string> options; // install_game: the plan's options chosen (ids)
     library::Overlay overlay = library::Overlay::off; // install_game, game_settings
     library::Cursor cursor = library::Cursor::touchpad; // install_game, game_settings (always now)
+    library::Resolution resolution = {};                // install_game, game_settings (0: the plan's)
 };
 // What the player chose, kept in /data/sahin/settings.txt.
 struct Settings
@@ -116,6 +117,9 @@ struct Settings
     std::map<std::string, library::Overlay> overlays;
     // Each game's mouse cursor, by title ID: none unless here. Kept as cursor.<title ID>=touchpad.
     std::map<std::string, library::Cursor> cursors;
+    // Each game's picture size (the page's Resolution), by title ID; a game not here has its
+    // plan's. Kept as resolution.<title ID>=3840x2160|2560x1440|1920x1080.
+    std::map<std::string, library::Resolution> resolutions;
 };
 std::string format_settings(const Settings &settings);
 Settings parse_settings(std::string_view text);
