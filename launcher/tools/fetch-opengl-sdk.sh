@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# ps5-homebrew-ui - Pinned ps5-opengl SDK download.
+# ps5-homebrew-ui - Pinned ps5-opengl SDK.
 # Copyright (C) 2026 BlackBearReloaded
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Downloads and verifies the pinned ps5-opengl release into .deps/ps5-opengl
-# and prints the SDK prefix (the directory holding manifest.sha256).
+# Verifies the pinned ps5-opengl SDK archive, unpacks it into .deps/ps5-opengl and prints the
+# SDK prefix (the directory holding manifest.sha256).
+#
+# Sahin: the SDK's release downloads (github.com/blackbearreloaded/ps5-opengl, v1.0.0) are
+# gone, so the SDK is built from source: the repository's ps5-opengl submodule (the fork
+# github.com/mpereiraesaa/ps5-opengl) at `commit`, by tools/build-opengl-sdk.sh (the
+# opengl-sdk step of tools/build.sh), which reads the version and commit from here. The build
+# is reproducible, so the hashes below are its output's. The archive is taken from
+# .deps/ps5-opengl/ or PS5_OPENGL_ARCHIVE; nothing is downloaded.
 
 set -euo pipefail
 
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-version=1.0.0
-archive_sha256=f93643c04c843d56143b00951df1f8042ea7706ae9f19e4e9abf158e1ead77c5
-manifest_sha256=f4b91f672be037fbac3f82494f1225deaf4c227a03f37ac3ffa56abb213b943f
-url="https://github.com/blackbearreloaded/ps5-opengl/releases/download/v$version/ps5-opengl-sdk-$version.tar.gz"
+version=0.6.0-31-gb696cd3
+commit=b696cd39d63a4e346da3c680a31238b41ae359a8
+archive_sha256=PENDING
+manifest_sha256=PENDING
 
 cache="$root/.deps/ps5-opengl"
 archive="$cache/ps5-opengl-sdk-$version.tar.gz"
@@ -21,13 +28,16 @@ prefix="$extracted/sdk"
 mkdir -p "$cache"
 
 if [[ ! -f $prefix/manifest.sha256 ]]; then
-    if [[ ! -f $archive ]] || ! sha256sum --check --status <<<"$archive_sha256  $archive"; then
-        printf '==> [opengl] Downloading ps5-opengl SDK %s\n' "$version" >&2
-        curl -fL --retry 3 -o "$archive.part" "$url"
-        mv -- "$archive.part" "$archive"
+    if [[ -n ${PS5_OPENGL_ARCHIVE:-} ]]; then
+        archive=$PS5_OPENGL_ARCHIVE
     fi
+    [[ -f $archive ]] || {
+        echo "no ps5-opengl SDK archive at $archive: build it with Sahin's" \
+            "tools/build.sh opengl-sdk (release/ps5-opengl-sdk-$version.tar.gz)" >&2
+        exit 2
+    }
     sha256sum --check --status <<<"$archive_sha256  $archive" || {
-        echo "ps5-opengl SDK archive checksum mismatch" >&2
+        echo "ps5-opengl SDK archive checksum mismatch: $archive" >&2
         exit 2
     }
     rm -rf -- "$extracted"
@@ -35,7 +45,6 @@ if [[ ! -f $prefix/manifest.sha256 ]]; then
     tar -xzf "$archive" -C "$cache" "ps5-opengl-sdk-$version/sdk" \
         "ps5-opengl-sdk-$version/LICENSE" "ps5-opengl-sdk-$version/LICENSES" \
         "ps5-opengl-sdk-$version/THIRD_PARTY_NOTICES.md"
-    rm -f -- "$archive"
 fi
 
 (cd "$prefix" && sha256sum --check --strict --quiet manifest.sha256) || {

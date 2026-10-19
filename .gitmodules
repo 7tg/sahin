@@ -14,3 +14,6 @@
 [submodule "PS5_Mesa"]
 	path = PS5_Mesa
 	url = https://github.com/mpereiraesaa/PS5_Mesa.git
+[submodule "ps5-opengl"]
+	path = ps5-opengl
+	url = https://github.com/mpereiraesaa/ps5-opengl.git

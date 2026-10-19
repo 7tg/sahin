@@ -14,7 +14,7 @@ BANNED_NAMES = ["blur.exe", "speed.exe", "binkw32.dll", "d3dx9_*.dll", "d3dcompi
 BANNED_EXT = {".bik", ".bk2", ".at9", ".pak", ".sig", ".level", ".levelphysics",
               ".levelrender", ".levelstream", ".asi", ".cab"}
 SKIP_DIRS = {".git", "prospero-win", "PS5_Mesa", "PS5_Vulkan", "PS5_PayloadSDK",
-             "ps5-native-app-boilerplate", ".deps", "build", "node_modules"}
+             "ps5-native-app-boilerplate", "ps5-opengl", ".deps", "build", "node_modules"}
 
 
 def is_pe(path):
