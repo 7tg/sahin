@@ -21,9 +21,10 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
   - **Amax client extras** (off by default): Amax's client, with profile pictures and its Lua
     plugins
 - Starts the game straight from its tile. **Hold □ while the tile starts** to open Sahin's
-  page instead. The page has the resolution (4K, 1440p or 1080p), a performance overlay,
-  the two options above, Repair (△) and Play.
-- In the game, hold Options and press the touchpad to quit.
+  page instead. The page has the resolution (3840×2160, 2560×1440 or 1920×1080), a
+  performance overlay, the two options above, Repair (△) and Play.
+- In the game, the touchpad moves the mouse pointer and pressing it clicks. To quit, hold
+  Options and the touchpad together for about a second.
 
 ## What you need
 
@@ -78,7 +79,7 @@ Checks on the build machine, without a console:
 | `tools/` | the build (`build.sh`), prospero-win, DXVK, the ps5-opengl SDK, the bare prefix, the bundle, the app zip, the audit, the host checks |
 | `patches/` | changes to prospero-win, PS5_Mesa, PS5_Vulkan and DXVK, from nfs-blackbox-ps5 |
 | `launcher/` | the app's launcher (`eboot.bin`): copy check, install, settings page. A fork of nfs-blackbox-launcher. |
-| `profile/blur/` | Blur as the install sees it: the plan generator, our config files, the known data files' sizes and hashes (numbers only) |
+| `profile/blur/` | Blur as the install sees it: the plan generator, our config files, the known data files' sizes and hashes (numbers only; `base.json`, written by `scan-copy.py`, is reference data: the launcher uses only `cache/root.pak`'s size and CRC-32, built into `base_game.cpp`) |
 | `art/` | the Home-screen art, drawn by `make-art.py` (nothing from the game) |
 | submodules | prospero-win, PS5_Mesa, PS5_Vulkan, PS5_PayloadSDK, ps5-native-app-boilerplate and ps5-opengl, at pinned commits |
 
