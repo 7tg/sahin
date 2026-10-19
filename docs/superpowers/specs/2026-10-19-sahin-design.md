@@ -70,7 +70,10 @@ Upstream fixes to the NFS repos are applied by hand when they matter.
 | `amax-redirect.asi` (Aib0t), with an `amax-redirect.cfg` we write | GitHub release asset `dae2d6b0…9acd` | on (online) |
 | Amax client 0.0.0.7: d3d9 proxy, auth, Lua plugins incl. 60 fps race cap | `cs.amax-emu.com/amax_client_files.zip` `4ee93bc7…25c7`; its d3d9 proxy falls back to C:\Windows\System32\d3d9.dll, which in the prefix is DXVK | off (option) |
 
-Not included: Discord RPC (no use on a PS5), Amax billboard ads (cosmetic), the FPS unlocker
+The Amax client extras also install the client's `discord-rpc.dll`, only because its d3d9
+proxy depends on it; nothing else uses it.
+
+Not included: Discord RPC (`blur_rpc.asi`; no use on a PS5), Amax billboard ads (cosmetic), the FPS unlocker
 (physics are tied to frame rate; the game stays at its cap), widescreen/FOV fixes (none exist;
 the game supports 16:9), Amax's patched `Blur.exe` (Activision's file; the README says the
 user's exe must run without SecuROM). `amax-redirect` patches offsets for the 1.2 exe: with
