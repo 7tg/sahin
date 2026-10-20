@@ -5,6 +5,8 @@ PS5, as a homebrew app with its own Home-screen tile (`PPSA99404`). It runs the 
 through [prospero-win](https://github.com/mpereiraesaa/prospero-win): Wine, DXVK and the
 PS5's Vulkan driver.
 
+Türkçe kılavuz: [docs/KILAVUZ.md](docs/KILAVUZ.md).
+
 **You need your own copy of the game. Nothing here contains it.** The repo and the app
 hold only our own code, patches, configuration and art, plus open-source projects built from
 source. The mods the game uses are downloaded by the console when you install, each pinned by
