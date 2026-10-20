@@ -134,6 +134,10 @@ int main()
     assert(!fs::exists(profiles / "pb-mw.profile") &&
            read(profiles / "profiles.lst") == "minesweeper.profile\npinball.profile\n");
     assert(remove_profile(profiles.string(), "pb-mw", error));
+    // A console where prospero-win never ran has no profiles folder yet.
+    const auto fresh = profiles / "profiles";
+    assert(install_profile(fresh.string(), most_wanted(), "", error));
+    assert(read(fresh / "profiles.lst") == "blur.profile\n");
     fs::remove_all(profiles);
     // [debug] env: the performance overlay, as prospero-win takes it; never with show_fps.
     {

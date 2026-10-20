@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <cstring>
 #include <string_view>
+#include <sys/stat.h>
 #include <unistd.h>
 
 namespace store::library
@@ -275,6 +276,12 @@ bool install_profile(const std::string &profiles, const GameProfile &profile,
     const auto original = list;
     if (!list_add(list, file, after, error))
         return false;
+    // prospero-win makes this folder on its first run, which may not have happened yet.
+    if (mkdir(profiles.c_str(), 0777) != 0 && errno != EEXIST)
+    {
+        error = "Can't make " + profiles + ": " + std::strerror(errno);
+        return false;
+    }
     // The profile before its line, so the launcher never lists a file that isn't there.
     if (auto failed = hui::save::write_atomic(profiles + "/" + file, text); !failed.empty())
     {
