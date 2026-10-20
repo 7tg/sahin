@@ -51,6 +51,10 @@ def test_strip_lists_mod_leftovers(tmp_path):
     strip = {s.lower() for s in plan(tmp_path)["strip"]}
     assert {"dsound.dll", "dinput8.dll", "d3d9.dll", "scripts", "amax", "lua5.1.dll", "discord-rpc.dll"} <= strip
 
+def test_players_save_seeds_blurs_save_folder(tmp_path):
+    assert plan(tmp_path)["user_seeds"] == [
+        {"from": "blursave", "file": "AppData/Roaming/Bizarre Creations/Blur/save/blursave"}]
+
 def test_resolution_reaches_blurs_settings(tmp_path):
     files = plan(tmp_path)["user_files"]
     assert files == [{

@@ -46,6 +46,10 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
 3. Open Sahin and press Install. It downloads the mods, copies your game into the prefix and
    adds them. Downloads are about 4 MB, or 7 MB with the Amax client extras.
 
+To start from a save you have (your own, or a finished one), put Blur's `blursave` file in
+`/data/sahin/saves/Blur/` before you install. A fresh install places it where Blur keeps its
+save; once Blur has a save of its own, the install never replaces it.
+
 After that, the tile starts the game.
 
 ## Building

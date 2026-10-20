@@ -110,6 +110,9 @@ int main()
            blur.user_files[0].element == "shared_graphical_settings" &&
            blur.user_files[0].attributes ==
                (std::vector<std::pair<std::string, std::string>>{{"width", "{width}"}, {"height", "{height}"}}));
+    // A save the player puts in saves/Blur is where Blur keeps its own.
+    assert(blur.user_seeds.size() == 1 && blur.user_seeds[0].from == "blursave" &&
+           blur.user_seeds[0].file == "AppData/Roaming/Bizarre Creations/Blur/save/blursave");
     std::string profile;
     assert(profile_text(blur.profile, profile, error));
 
@@ -189,7 +192,8 @@ int main()
         " \"pending\": [\"A mod with no source yet\"],"
         " \"user_files\": [{\"file\": \"AppData/Roaming/Game Co/settings.xml\","
         " \"element\": \"video\", \"attributes\": {\"width\": \"{width}\", \"height\": \"{height}\","
-        " \"mode\": \"full\"}}]}";
+        " \"mode\": \"full\"}}],"
+        " \"user_seeds\": [{\"from\": \"save.dat\", \"file\": \"Saved Games/Game Co/save.dat\"}]}";
     InstallPlan plan;
     assert(parse_plan(plan_text, plan, error));
     assert(plan.pending.size() == 1 && plan.source("mods")->url == "https://example.com/mods.zip");
@@ -197,6 +201,8 @@ int main()
     assert(plan.user_files.size() == 1 && plan.user_files[0].element == "video" &&
            plan.user_files[0].attributes.size() == 3 &&
            plan.user_files[0].attributes[0] == std::make_pair("width"s, "{width}"s));
+    assert(plan.user_seeds.size() == 1 && plan.user_seeds[0].from == "save.dat" &&
+           plan.user_seeds[0].file == "Saved Games/Game Co/save.dat");
 
     // Plans that would write outside their folders, or name what isn't there, are refused.
     const auto refused = [&](std::string from, std::string to)
@@ -236,6 +242,9 @@ int main()
     // only the placeholders it knows.
     assert(refused("\"AppData/Roaming", "\"../AppData/Roaming") && error.find("user_files") != std::string::npos);
     assert(refused("\"AppData/Roaming", "\"/AppData/Roaming"));
+    assert(refused("\"from\": \"save.dat\"", "\"from\": \"../save.dat\"") &&
+           error.find("user_seeds") != std::string::npos);
+    assert(refused("\"Saved Games/Game Co/save.dat\"", "\"Saved Games/../../save.dat\""));
     assert(refused("\"element\": \"video\"", "\"element\": \"vid eo\""));
     assert(refused("\"element\": \"video\"", "\"element\": \"\""));
     assert(refused("\"element\": \"video\", ", ""));
@@ -548,6 +557,24 @@ int main()
         fs::remove_all(outside);
         fs::remove_all(users / "Public");
         fs::remove_all(users / "me" / "AppData");
+    }
+
+    // A save the player keeps in saves/<game> (any case): copied into each Windows user's folder
+    // on install, folders made on the way, only where that user has none yet; never into Public.
+    {
+        const auto users = prefix / "drive_c" / "users";
+        const auto save = users / "me" / "Saved Games" / "Game Co" / "save.dat";
+        fs::create_directories(users / "me");
+        assert(install_game(plan, game, paths, options, progress, go, error) && !fs::exists(save));
+        put(data / "saves" / "game" / "save.dat", "finished");
+        put(users / "Public" / "keep", "");
+        assert(install_game(plan, game, paths, options, progress, go, error));
+        assert(read(save) == "finished" && !fs::exists(users / "Public" / "Saved Games"));
+        put(save, "played on");
+        assert(install_game(plan, game, paths, options, progress, go, error) && read(save) == "played on");
+        fs::remove_all(users / "me" / "Saved Games");
+        fs::remove_all(users / "Public");
+        fs::remove_all(data / "saves");
     }
 
     // The touchpad as the mouse (the default now): the plan's touchpad ini edits after its

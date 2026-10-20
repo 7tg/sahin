@@ -713,6 +713,41 @@ bool apply_user_files(const InstallPlan &plan, const InstallPaths &paths, std::s
     return true;
 }
 
+bool seed_user_files(const InstallPlan &plan, const InstallPaths &paths, std::string &error)
+{
+    if (plan.user_seeds.empty())
+        return true;
+    std::string saves, users;
+    resolve(paths.data_root, "saves/" + plan.game, false, saves);
+    resolve(paths.win_root + "/prefixes/" + plan.prefix, "drive_c/users", false, users);
+    if (!is_directory(saves))
+        return true;
+    for (const auto &user : names_in(users))
+    {
+        // A user's own folder, not one reached through a link: nothing outside the prefix.
+        if (strcasecmp(user.c_str(), "Public") == 0 || !is_directory(users + "/" + user))
+            continue;
+        for (const auto &seed : plan.user_seeds)
+        {
+            std::string from, to;
+            resolve(saves, seed.from, false, from);
+            if (!is_file(from))
+                continue;
+            if (!resolve(users + "/" + user, seed.file, true, to))
+            {
+                error = "Can't make the folders for " + user + "/" + seed.file + ": " + std::strerror(errno);
+                return false;
+            }
+            struct stat info{};
+            if (lstat(to.c_str(), &info) == 0)
+                continue; // the game's own: kept
+            if (!copy_one(from, to, error))
+                return false;
+        }
+    }
+    return true;
+}
+
 std::vector<OptionView> option_views(const InstallPlan &plan, const InstallPaths &paths,
                                      const InstallOptions &options)
 {
@@ -1039,7 +1074,7 @@ bool install_game(const InstallPlan &given, const Manifest &manifest, const Inst
         !save_registry(prefix + "/user.reg", user, error))
         return false;
     if (!install_profile(paths.win_root + "/profiles", plan.profile, plan.profile_after, error) ||
-        !apply_user_files(plan, paths, error))
+        !apply_user_files(plan, paths, error) || !seed_user_files(plan, paths, error))
         return false;
 
     // ---- what was installed, for repair and updates ----

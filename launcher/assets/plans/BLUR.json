@@ -66,6 +66,12 @@
    }
   }
  ],
+ "user_seeds": [
+  {
+   "from": "blursave",
+   "file": "AppData/Roaming/Bizarre Creations/Blur/save/blursave"
+  }
+ ],
  "profile": {
   "id": "pb-blur",
   "name": "Sahin",

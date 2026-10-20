@@ -79,6 +79,17 @@ struct UserFile
     std::vector<std::pair<std::string, std::string>> attributes; // in the plan's order
 };
 
+// A file the player keeps in <data_root>/saves/<game>/<from> (any case), such as a save to
+// start from, copied on install into each Windows user's folder at <file> (every one but
+// Public) where that user has none yet: the game's own copy, once it has one, is never
+// replaced. Folders on the way are made. A missing <from> copies nothing.
+//   "user_seeds": [{"from": "blursave", "file": "AppData/Roaming/.../save/blursave"}]
+struct UserSeed
+{
+    std::string from; // relative to saves/<game>
+    std::string file; // relative to the user's folder
+};
+
 struct RegistryValue
 {
     std::string key;  // single backslashes, relative to the file's root
@@ -106,6 +117,7 @@ struct InstallPlan
     std::vector<RegistryValue> machine; // system.reg
     std::vector<RegistryValue> user;    // user.reg
     std::vector<UserFile> user_files;   // the game's own settings, kept to the profile's
+    std::vector<UserSeed> user_seeds;   // the player's files the game starts from
     GameProfile profile;
     std::string profile_after; // profiles.lst: listed after this line, when it's there
     // Pieces of the finished setup the plan can't install yet (no pinned source):

@@ -59,6 +59,12 @@ USER_FILES = [
     },
 ]
 
+# A save the player puts in /data/sahin/saves/Blur (their own; none ships with Sahin), which a
+# fresh install starts from. Blur's own save, once it has one, is never replaced.
+USER_SEEDS = [
+    {"from": "blursave", "file": "AppData/Roaming/Bizarre Creations/Blur/save/blursave"},
+]
+
 
 def text(name):
     return (HERE / name).read_text()
@@ -82,6 +88,7 @@ def plan():
         "expect": {},
         "registry": {"machine": [], "user": []},
         "user_files": USER_FILES,
+        "user_seeds": USER_SEEDS,
         "profile": {
             "id": "pb-blur",
             "name": "Sahin",

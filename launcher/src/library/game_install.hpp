@@ -133,6 +133,8 @@ bool apply_ini(const InstallPlan &plan, const InstallPaths &paths, std::string &
 // settings change writes it again. A file the game hasn't written yet is left for later; none
 // is made. False with error set when one can't be read or written.
 bool apply_user_files(const InstallPlan &plan, const InstallPaths &paths, std::string &error);
+// The plan's user_seeds: the player's files from saves/<game>, where a user has none yet.
+bool seed_user_files(const InstallPlan &plan, const InstallPaths &paths, std::string &error);
 
 // The plan's options, each on or off as the last install (its record) chose, or as the plan
 // says when there is no install yet.

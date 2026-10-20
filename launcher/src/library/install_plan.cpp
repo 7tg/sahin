@@ -199,6 +199,28 @@ bool attribute_value(const std::string &value)
     return true;
 }
 
+void user_seeds(Reader &read, yyjson_val *root, std::vector<UserSeed> &out)
+{
+    auto *list = array(read, root, "user_seeds");
+    std::size_t index = 0, count = 0;
+    yyjson_val *item = nullptr;
+    yyjson_arr_foreach(list, index, count, item)
+    {
+        const auto where = "user_seeds[" + std::to_string(index) + "]";
+        if (!yyjson_is_obj(item))
+        {
+            read.fail(where + " must be an object");
+            return;
+        }
+        UserSeed seed;
+        seed.from = read.text(item, "from", true, where);
+        seed.file = read.text(item, "file", true, where);
+        if (!safe_relative(seed.from) || !safe_relative(seed.file))
+            read.fail(where + ": from and file must be plain relative paths");
+        out.push_back(std::move(seed));
+    }
+}
+
 void user_files(Reader &read, yyjson_val *root, std::vector<UserFile> &out)
 {
     auto *list = array(read, root, "user_files");
@@ -410,6 +432,7 @@ bool parse_plan(std::string_view text, InstallPlan &out, std::string &error)
     registry(read, reg, "machine", plan.machine);
     registry(read, reg, "user", plan.user);
     user_files(read, root, plan.user_files);
+    user_seeds(read, root, plan.user_seeds);
 
     auto *profile = yyjson_obj_get(root, "profile");
     if (!profile || !yyjson_is_obj(profile))
