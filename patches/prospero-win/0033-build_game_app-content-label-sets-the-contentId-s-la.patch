@@ -1,0 +1,68 @@
+From 858346268773690722602e5b6afaa6048238a54c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
+ <20913374+7tg@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 12:30:00 +0300
+Subject: [PATCH] build_game_app: --content-label sets the contentId's label
+
+A game's app took its contentId label from the profile id (pb-blur gave
+PBBLUR0000000APP). --content-label gives it one of its own, 16 characters
+A-Z and 0-9.
+---
+ tools/build_game_app.sh | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index 8c96c4e..ac65456 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -23,12 +23,16 @@
+ #
+ #   tools/build_game_app.sh --title-id PPSA99996 --name "NFS Most Wanted" \
+ #       --profile nfs-most-wanted-2005 [--icon art.png] [--background bg.png] [--logo logo.png] [--music snd0.at9] \
++#       [--content-label NFSMW00000000APP] \
+ #       --package ../release-main/PPSA99995 --out ../release-main/apps
++#
++# The contentId's label (its last 16 characters, A-Z and 0-9) is --content-label, or else
++# the profile id's letters and digits, padded with 0 and ended with APP.
+ set -euo pipefail
+ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ lapy_url=https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git
+ lapy_commit=b48b7d7236eca25c7b9dfd6c040c763ae05dde80   # v0.3.2-experimental, as build_native.sh fetches
+-title_id= name= profile= icon= background= logo= music= package= out=
++title_id= name= profile= icon= background= logo= music= package= out= content_label=
+ while [[ $# -gt 0 ]]; do
+     case $1 in
+     --title-id) title_id=$2; shift 2 ;;
+@@ -40,11 +44,13 @@ while [[ $# -gt 0 ]]; do
+     --music) music=$2; shift 2 ;;
+     --package) package=$2; shift 2 ;;
+     --out) out=$2; shift 2 ;;
++    --content-label) content_label=$2; shift 2 ;;
+     *) echo "build_game_app: unknown argument $1" >&2; exit 2 ;;
+     esac
+ done
+ [[ $title_id =~ ^[A-Z]{4}[0-9]{5}$ && $title_id != PPSA99995 && -n $name &&
+-   $profile =~ ^[A-Za-z0-9_.-]+$ && -f $package/eboot.bin && -n $out ]] || {
++   $profile =~ ^[A-Za-z0-9_.-]+$ && -f $package/eboot.bin && -n $out &&
++   ( -z $content_label || $content_label =~ ^[A-Z0-9]{16}$ ) ]] || {
+     echo "usage: $0 --title-id PPSA99996 --name NAME --profile ID [--icon PNG] --package DIR --out DIR" >&2
+     exit 2; }
+ foundation=${PS5_NATIVE_FOUNDATION:-$root/.deps/ps5-native-app-boilerplate}
+@@ -77,11 +83,11 @@ rsync -a --delete --exclude=dev.conf "$package/" "$app/"
+ cp "$dist/eboot.bin" "$app/eboot.bin"
+ cp "$dist/lapy.elf" "$app/lapy.elf"
+ chmod 755 "$app/eboot.bin"
+-python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" <<'PY'
++python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" "$content_label" <<'PY'
+ import json, re, sys
+-template, out, title_id, name, profile = sys.argv[1:]
++template, out, title_id, name, profile, content_label = sys.argv[1:]
+ param = json.load(open(template))     # keeps attribute3: the high-frame-rate declaration
+-label = re.sub(r"[^A-Z0-9]", "", profile.upper())[:13].ljust(13, "0") + "APP"
++label = content_label or re.sub(r"[^A-Z0-9]", "", profile.upper())[:13].ljust(13, "0") + "APP"
+ param["titleId"] = title_id
+ param["conceptId"] = title_id[4:]
+ param["contentId"] = f"UP9000-{title_id}_00-{label}"
+-- 
+2.56.0
+
