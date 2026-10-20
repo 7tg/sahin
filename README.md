@@ -34,10 +34,10 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
   and [ShadowMount+](https://github.com/drakmor/ShadowMountPlus) to install apps from
   `/data/homebrew`. Developed for firmware 13.60 with kstuff-lite, ShadowMount+ and Payload
   Manager.
-- **Your Blur folder, with a `Blur.exe` that runs without SecuROM.** The retail exe, from the
-  disc or the old Steam release, carries SecuROM, which does not run under Wine. Sahin accepts
-  any exe, so a retail one installs fine and then closes at once. If that happens, the page
-  tells you on the next start.
+- **Your Blur folder.** Blur's retail exe, from the disc or the old Steam release, carries the
+  SecuROM copy protection, which does not run under Wine: such a copy installs, then closes as
+  soon as it starts, and the page tells you so on the next start. Sahin does not remove or get
+  around SecuROM and does not point to anything that does.
 
 ## On the console
 

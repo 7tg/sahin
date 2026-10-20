@@ -1,0 +1,81 @@
+From 2a8e9d4add7c0070cf16016519621a76d329ad12 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
+ <20913374+7tg@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 18:00:00 +0300
+Subject: [PATCH] build_game_app: --content-publisher and --content-version
+
+The contentId's first part was always UP9000 and the version always
+prospero-win's. --content-publisher gives the region and publisher (two
+letters, four digits) and --content-version the app's own version
+(NN.NNN.NNN).
+---
+ tools/build_game_app.sh | 22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/tools/build_game_app.sh b/tools/build_game_app.sh
+index ac65456..f67c147 100755
+--- a/tools/build_game_app.sh
++++ b/tools/build_game_app.sh
+@@ -23,16 +23,18 @@
+ #
+ #   tools/build_game_app.sh --title-id PPSA99996 --name "NFS Most Wanted" \
+ #       --profile nfs-most-wanted-2005 [--icon art.png] [--background bg.png] [--logo logo.png] [--music snd0.at9] \
+-#       [--content-label NFSMW00000000APP] \
++#       [--content-label NFSMW00000000APP] [--content-publisher UP0000] [--content-version 01.001.000] \
+ #       --package ../release-main/PPSA99995 --out ../release-main/apps
+ #
+ # The contentId's label (its last 16 characters, A-Z and 0-9) is --content-label, or else
+-# the profile id's letters and digits, padded with 0 and ended with APP.
++# the profile id's letters and digits, padded with 0 and ended with APP. Its first part, the
++# region and publisher (two letters, four digits), is --content-publisher, or else UP9000; the
++# app's version is --content-version (NN.NNN.NNN), or else prospero-win's own.
+ set -euo pipefail
+ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ lapy_url=https://github.com/mpereiraesaa/PS5-Lapy-JB-Daemon.git
+ lapy_commit=b48b7d7236eca25c7b9dfd6c040c763ae05dde80   # v0.3.2-experimental, as build_native.sh fetches
+-title_id= name= profile= icon= background= logo= music= package= out= content_label=
++title_id= name= profile= icon= background= logo= music= package= out= content_label= content_publisher=UP9000 content_version=
+ while [[ $# -gt 0 ]]; do
+     case $1 in
+     --title-id) title_id=$2; shift 2 ;;
+@@ -45,12 +47,15 @@ while [[ $# -gt 0 ]]; do
+     --package) package=$2; shift 2 ;;
+     --out) out=$2; shift 2 ;;
+     --content-label) content_label=$2; shift 2 ;;
++    --content-publisher) content_publisher=$2; shift 2 ;;
++    --content-version) content_version=$2; shift 2 ;;
+     *) echo "build_game_app: unknown argument $1" >&2; exit 2 ;;
+     esac
+ done
+ [[ $title_id =~ ^[A-Z]{4}[0-9]{5}$ && $title_id != PPSA99995 && -n $name &&
+    $profile =~ ^[A-Za-z0-9_.-]+$ && -f $package/eboot.bin && -n $out &&
+-   ( -z $content_label || $content_label =~ ^[A-Z0-9]{16}$ ) ]] || {
++   ( -z $content_label || $content_label =~ ^[A-Z0-9]{16}$ ) && $content_publisher =~ ^[A-Z]{2}[0-9]{4}$ &&
++   ( -z $content_version || $content_version =~ ^[0-9]{2}\.[0-9]{3}\.[0-9]{3}$ ) ]] || {
+     echo "usage: $0 --title-id PPSA99996 --name NAME --profile ID [--icon PNG] --package DIR --out DIR" >&2
+     exit 2; }
+ foundation=${PS5_NATIVE_FOUNDATION:-$root/.deps/ps5-native-app-boilerplate}
+@@ -83,14 +88,17 @@ rsync -a --delete --exclude=dev.conf "$package/" "$app/"
+ cp "$dist/eboot.bin" "$app/eboot.bin"
+ cp "$dist/lapy.elf" "$app/lapy.elf"
+ chmod 755 "$app/eboot.bin"
+-python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" "$content_label" <<'PY'
++python3 - "$root/sce_sys/param.json" "$app/sce_sys/param.json" "$title_id" "$name" "$profile" "$content_label" \
++    "$content_publisher" "$content_version" <<'PY'
+ import json, re, sys
+-template, out, title_id, name, profile, content_label = sys.argv[1:]
++template, out, title_id, name, profile, content_label, publisher, version = sys.argv[1:]
+ param = json.load(open(template))     # keeps attribute3: the high-frame-rate declaration
+ label = content_label or re.sub(r"[^A-Z0-9]", "", profile.upper())[:13].ljust(13, "0") + "APP"
+ param["titleId"] = title_id
+ param["conceptId"] = title_id[4:]
+-param["contentId"] = f"UP9000-{title_id}_00-{label}"
++param["contentId"] = f"{publisher}-{title_id}_00-{label}"
++if version:
++    param["contentVersion"] = version
+ param["localizedParameters"] = {"defaultLanguage": "en-US", "en-US": {"titleName": name}}
+ json.dump(param, open(out, "w"), indent=2)
+ open(out, "a").write("\n")
+-- 
+2.56.0
+

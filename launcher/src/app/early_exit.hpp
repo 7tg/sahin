@@ -14,8 +14,8 @@ namespace store
 inline constexpr std::time_t kEarlyExitSeconds = 20;
 // What the page says then: the likely cause is a retail Blur.exe, whose SecuROM won't run here.
 inline constexpr const char *kEarlyExitHint =
-    "Blur closed right after it started. If your Blur.exe is the retail one with SecuROM, it "
-    "won't run here: use a DRM-free exe.";
+    "Blur closed right after it started. A retail Blur.exe carries SecuROM, which doesn't run "
+    "here.";
 
 // Writes now (seconds since the epoch) into path, as the game is started. False when it
 // can't be written.

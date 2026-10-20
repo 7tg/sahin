@@ -26,10 +26,10 @@ bulunur. Sahin'in Activision, Bizarre Creations veya Sony ile bir bağlantısı 
   çalışan bir ELF yükleyici ve `/data/homebrew` klasöründen uygulama kuran
   [ShadowMount+](https://github.com/drakmor/ShadowMountPlus). Uygulama, kstuff-lite,
   ShadowMount+ ve Payload Manager kurulu 13.60 yazılımlı bir konsolda geliştirildi.
-- **SecuROM olmadan çalışan bir `Blur.exe` içeren Blur klasörünüz.** Diskteki ya da eski
-  Steam sürümündeki orijinal exe SecuROM korumalıdır ve Wine altında çalışmaz. Sahin her
-  exe'yi kabul eder; SecuROM'lu bir exe kurulur ama oyun hemen kapanır. Bu olursa Sahin bir
-  sonraki açılışta bunu size söyler.
+- **Blur klasörünüz.** Diskteki ya da eski Steam sürümündeki orijinal exe, Wine altında
+  çalışmayan SecuROM kopya korumasını taşır: böyle bir kopya kurulur ama oyun açılır açılmaz
+  kapanır ve Sahin bir sonraki açılışta bunu size söyler. Sahin SecuROM'u kaldırmaz, aşmaz ve
+  bunu yapan bir şeye yönlendirmez.
 
 ## Kurulum
 
@@ -96,8 +96,8 @@ oyun bundan etkilenmez.
 
 - **Kutucuk görünmüyor:** konsolu yeniden başlatın ve klasörün tam olarak
   `/data/homebrew/PPSA99404/` konumunda olduğunu kontrol edin.
-- **Oyun açılır açılmaz kapanıyor:** `Blur.exe` büyük olasılıkla SecuROM korumalıdır. Sahin
-  bir sonraki açılışta bunu söyler. SecuROM olmadan çalışan bir exe kullanın.
+- **Oyun açılır açılmaz kapanıyor:** `Blur.exe` büyük olasılıkla SecuROM korumalıdır ve
+  SecuROM Wine altında çalışmaz. Sahin bir sonraki açılışta bunu söyler.
 - **Kurulum hata veriyor:** Blur klasörünün `/data/sahin/base-games/Blur` konumunda olduğunu
   ve `Blur.exe`, `binkw32.dll`, `cache`, `levels` ve `UI` öğelerini içerdiğini kontrol edin.
   Sorun sürerse sayfadaki Repair (△) ile onarın.

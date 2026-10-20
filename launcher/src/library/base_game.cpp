@@ -21,7 +21,7 @@ namespace
 {
 // ---- the games ----------------------------------------------------------------
 
-// Blur (2010) for PC: one release, 1.2. The exe is never checked (any DRM-free exe is
+// Blur (2010) for PC: one release, 1.2. The exe is never checked (any exe is
 // accepted); cache/root.pak tells a known copy, and an unknown one is installed with a warning.
 constexpr const char *kBlurFolders[] = {"cache", "levels", "UI", "UI/movies"};
 constexpr const char *kBlurFiles[] = {"Blur.exe", "binkw32.dll", "cache/root.pak",

@@ -169,19 +169,22 @@ if want apps; then
         make -C "$W/PS5_Vulkan" assets-deps
     fi
     # title id | name | the profile it starts | art (art/<art>.png icon, -bg.png background,
-    # -logo.png, .at9 music) | the contentId's label (16 A-Z/0-9). The manager's apps (PPSA994xx) start the id their game's plan
-    # gives its profile (launcher/assets/plans/<game>.json).
-    while IFS='|' read -r tid name profile art label; do
+    # -logo.png, .at9 music) | the contentId's label (16 A-Z/0-9) | its region and publisher (UP0000:
+    # a placeholder, not a real publisher's) | the app's contentVersion. The manager's apps
+    # (PPSA994xx) start the id their game's plan gives its profile (launcher/assets/plans/<game>.json).
+    while IFS='|' read -r tid name profile art label publisher version; do
         [[ -z $tid || $tid == \#* ]] && continue
         args=(--title-id "$tid" --name "$name" --profile "$profile" --package "$out/PPSA99995" --out "$out/apps")
         [[ -n $label ]] && args+=(--content-label "$label")
+        [[ -n $publisher ]] && args+=(--content-publisher "$publisher")
+        [[ -n $version ]] && args+=(--content-version "$version")
         [[ -f $W/art/$art.png ]] && args+=(--icon "$W/art/$art.png")
         [[ -f $W/art/$art-bg.png ]] && args+=(--background "$W/art/$art-bg.png")
         [[ -f $W/art/$art-logo.png ]] && args+=(--logo "$W/art/$art-logo.png")
         [[ -f $W/art/$art.at9 ]] && args+=(--music "$W/art/$art.at9")
         tools/build_game_app.sh "${args[@]}"
     done <<'APPS'
-PPSA99404|Sahin|pb-blur|sahin|SAHINBLUR0000000
+PPSA99404|Sahin|pb-blur|sahin|SAHINBLUR0000000|UP0000|01.001.000
 APPS
 fi
 if want dxvk; then
