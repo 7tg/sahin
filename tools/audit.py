@@ -8,7 +8,9 @@ ROOT/.audit-allow lists globs (relative to ROOT; blank lines and # comments igno
 files (Wine's DLLs, DXVK). Every *.zip is audited member by member too (findings read ZIP!MEMBER);
 a line ZIPGLOB!MEMBERGLOB allows the members matching MEMBERGLOB in the zips matching ZIPGLOB,
 e.g. assets/bundle/*.zip!drive_c/windows/system32/* (fnmatch globs: * crosses folders). A plain
-line never covers a zip's members. Exit 0 clean, 1 with one line per finding.
+line never covers a zip's members. ZIPGLOB!wine:MEMBERGLOB allows those members only when they
+carry Wine's own marker ("Wine builtin DLL" / "Wine placeholder DLL"), so a Microsoft file
+dropped among Wine's is still caught. Exit 0 clean, 1 with one line per finding.
 """
 import fnmatch, pathlib, sys, zipfile
 
@@ -16,6 +18,7 @@ BANNED_NAMES = ["blur.exe", "speed.exe", "binkw32.dll", "d3dx9_*.dll", "d3dcompi
                 "msvcr*.dll", "msvcp*.dll", "xinput1_*.dll", "physx*.dll", "*.securom"]
 BANNED_EXT = {".bik", ".bk2", ".at9", ".pak", ".sig", ".level", ".levelphysics",
               ".levelrender", ".levelstream", ".asi", ".cab"}
+WINE_MARKERS = (b"Wine builtin DLL", b"Wine placeholder DLL")
 SKIP_DIRS = {".git", "prospero-win", "PS5_Mesa", "PS5_Vulkan", "PS5_PayloadSDK",
              "ps5-native-app-boilerplate", "ps5-opengl", ".deps", "build", "node_modules"}
 
@@ -45,11 +48,17 @@ def audit_zip(path, rel, member_allow):
         z = zipfile.ZipFile(path)
     except zipfile.BadZipFile:
         return [f"{rel}: unreadable zip"]
+    plain = [g for g in member_allow if not g.startswith("wine:")]
+    wine = [g[len("wine:"):] for g in member_allow if g.startswith("wine:")]
     findings = []
     with z:
         for info in z.infolist():
-            if info.is_dir() or any(fnmatch.fnmatch(info.filename, g) for g in member_allow):
+            if info.is_dir() or any(fnmatch.fnmatch(info.filename, g) for g in plain):
                 continue
+            if any(fnmatch.fnmatch(info.filename, g) for g in wine):
+                body = z.read(info)
+                if any(marker in body for marker in WINE_MARKERS):
+                    continue
             with z.open(info) as f:
                 first = f.read(2)
             finding = check(f"{rel}!{info.filename}", info.filename.rsplit("/", 1)[-1].lower(), first)

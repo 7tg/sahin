@@ -7,9 +7,18 @@ win/wine/lib/wine/x86_64-windows/*
 win/mesa-zink/i386-windows/*
 win/mesa-zink/x86_64-windows/*
 # The bare prefix the bundle carries: Wine's builtin DLLs and programs as the prefix step's
-# wineboot installs them, and our DXVK (d3d8/9/10core/11, dxgi), in system32 and syswow64.
-assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/*
-assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/*
-# Wine's side-by-side folders (the _none_deadbeef names are Wine's own): copies of its builtin
-# msvcr80/90, atl, msxml, comctl32 and gdiplus that wineboot puts there, not Microsoft's files.
-assets/bundle/bare-prefix-sahin.zip!drive_c/windows/winsxs/*_none_deadbeef/*
+# wineboot installs them (only members with Wine's own marker pass, so a Microsoft file among
+# them is still caught), Wine's generated WinRT metadata, and our DXVK in system32/syswow64.
+assets/bundle/bare-prefix-sahin.zip!wine:drive_c/*
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/winmetadata/*.winmd
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/winmetadata/*.winmd
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/d3d8.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/d3d9.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/d3d10core.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/d3d11.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/system32/dxgi.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d8.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d9.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d10core.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d11.dll
+assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/dxgi.dll

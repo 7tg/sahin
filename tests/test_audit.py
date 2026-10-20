@@ -68,3 +68,13 @@ def test_plain_allow_line_does_not_cover_zip_members(tmp_path):
     make_zip(tmp_path / "b.zip", {"x.dll": b"MZ" + b"\0" * 62})
     (tmp_path / ".audit-allow").write_text("b.zip\n")
     assert run(tmp_path).returncode == 1
+
+
+def test_zip_wine_rule_allows_only_wine_builtins(tmp_path):
+    import zipfile
+    with zipfile.ZipFile(tmp_path / "p.zip", "w") as z:
+        z.writestr("drive_c/windows/system32/kernel32.dll", b"MZ" + b"\0" * 60 + b"Wine builtin DLL")
+        z.writestr("drive_c/windows/system32/real.dll", b"MZ" + b"\0" * 60)
+    (tmp_path / ".audit-allow").write_text("p.zip!wine:drive_c/windows/*\n")
+    out = run(tmp_path).stdout
+    assert "kernel32.dll" not in out and "real.dll" in out
