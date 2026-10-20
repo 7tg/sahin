@@ -19,3 +19,4 @@ __pycache__/
 
 # The host install check's copy, prefix and install (tools/host-install.sh).
 /host-check/
+/docs/superpowers/
