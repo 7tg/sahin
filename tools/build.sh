@@ -135,6 +135,9 @@ if want game-app; then
     for t in miniz/LICENSE monocypher/LICENCE.md picosha2/LICENSE stb/LICENSE yyjson/LICENSE; do
         cp \$L/src/third_party/\$t \$A/LICENSES/launcher/\${t%%/*}-\${t##*/}
     done
+    # SOURCES.txt and THIRD_PARTY.md, which prospero-win's packager wrote for its own package:
+    # made to name this commit, the launcher and our DXVK, and to describe this folder.
+    python3 tools/make-notices.py \$A \$REV
     python3 tools/make-app-zip.py \$A release/PPSA99404.zip
 fi
 if want audit; then

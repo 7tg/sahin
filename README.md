@@ -89,7 +89,7 @@ Checks on the build machine, without a console:
 
 | Path | What |
 | --- | --- |
-| `tools/` | the build (`build.sh`), prospero-win, DXVK, the ps5-opengl SDK, the bare prefix, the bundle, the app zip, the audit, the host checks |
+| `tools/` | the build (`build.sh`), prospero-win, DXVK, the ps5-opengl SDK, the bare prefix, the bundle, the app's `SOURCES.txt` and `THIRD_PARTY.md` (`make-notices.py`), the app zip, the audit, the host checks |
 | `patches/` | changes to prospero-win, PS5_Mesa, PS5_Vulkan and DXVK, from nfs-blackbox-ps5 |
 | `launcher/` | the app's launcher (`eboot.bin`): copy check, install, settings page. A fork of nfs-blackbox-launcher. |
 | `profile/blur/` | Blur as the install sees it: the plan generator, our config files, the known data files' sizes and hashes (numbers only; `base.json`, written by `scan-copy.py`, is reference data: the launcher uses only `cache/root.pak`'s size and CRC-32, built into `base_game.cpp`) |
@@ -116,4 +116,7 @@ Checks on the build machine, without a console:
 ## License
 
 GPL-3.0 (`LICENSE`). The patches in `patches/` follow the licences of the projects they
-change, and the submodules keep their own.
+change, and the submodules keep their own. The app folder's `THIRD_PARTY.md` says what each
+part of it is and under which licence, with the texts in `LICENSES/`, and its `SOURCES.txt`
+names the exact source of each part: this repository at the commit the app was built from,
+the launcher, DXVK, and prospero-win's own records of Wine, Mesa and the rest.
