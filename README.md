@@ -85,6 +85,7 @@ Checks on the build machine, without a console:
 | `launcher/` | the app's launcher (`eboot.bin`): copy check, install, settings page. A fork of nfs-blackbox-launcher. |
 | `profile/blur/` | Blur as the install sees it: the plan generator, our config files, the known data files' sizes and hashes (numbers only; `base.json`, written by `scan-copy.py`, is reference data: the launcher uses only `cache/root.pak`'s size and CRC-32, built into `base_game.cpp`) |
 | `art/` | the Home-screen art, drawn by `make-art.py` (nothing from the game) |
+| `sce_sys/param.json` | a copy of the `param.json` the app ships (written by the build), so the title ID and content version can be read from the repo |
 | submodules | prospero-win, PS5_Mesa, PS5_Vulkan, PS5_PayloadSDK, ps5-native-app-boilerplate and ps5-opengl, at pinned commits |
 
 ## Credits
