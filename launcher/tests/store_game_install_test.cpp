@@ -627,6 +627,37 @@ int main()
     assert(fs::exists(win / "prefixes" / "pb-test" / "drive_c" / "Games" / "GAME"));
     assert(uninstall_game(plan, paths, options, error)); // again: nothing left to do
 
+    // The PS5's language: the marker renamed when the copy's marker offers it, else left alone.
+    {
+        assert(marker_language(2) == "french" && marker_language(22) == "french" &&
+               marker_language(18) == "english" && marker_language(19).empty()); // Turkish: none
+        const std::string note = "To change language, rename this file to either:\r\n\r\n"
+                                 "english.txt\r\nfrench.txt\r\nitalian.txt\r\n";
+        assert((marker_languages(note) == std::vector<std::string>{"english", "french", "italian"}));
+        assert(marker_languages("readme.txt notes.txt").empty());
+        InstallPlan lang = plan;
+        lang.prefix = "pb-test";
+        const fs::path folder = win / "prefixes" / "pb-test" / "drive_c" / "Games" / "GAME";
+        std::string done;
+        assert(apply_system_language(lang, paths, 2, done, error) && done == "no language file");
+        put(folder / "English.txt", note);
+        assert(apply_system_language(lang, paths, 2, done, error) && done == "english -> french");
+        assert(spelled(folder, "french.txt") && !spelled(folder, "English.txt") &&
+               read(folder / "french.txt") == note);
+        assert(apply_system_language(lang, paths, 22, done, error) && done == "french already");
+        assert(apply_system_language(lang, paths, 4, done, error) && spelled(folder, "french.txt") &&
+               done.find("isn't one this copy has") != std::string::npos);    // German: not here
+        assert(apply_system_language(lang, paths, 19, done, error) && spelled(folder, "french.txt"));
+        assert(apply_system_language(lang, paths, 1, done, error) && spelled(folder, "english.txt"));
+        put(folder / "italian.txt", note);   // two markers: neither is touched
+        assert(apply_system_language(lang, paths, 2, done, error) && spelled(folder, "english.txt") &&
+               spelled(folder, "italian.txt") && done.find("more than one") != std::string::npos);
+        InstallPlan nowhere = lang;
+        nowhere.prefix = "nowhere";
+        assert(!apply_system_language(nowhere, paths, 2, done, error) && !error.empty());
+        error.clear();
+    }
+
     fs::remove_all(root);
     std::cout << "Game install checks passed\n";
 }

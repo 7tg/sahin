@@ -30,6 +30,10 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
 - The DualSense rumbles when Blur asks for it, and L2 and R2 vibrate with it. The PS5's
   trigger effect intensity setting (Accessibility or Accessories, Controllers) turns the
   triggers' part down or off.
+- Blur plays in the PS5's language when your copy has it. A copy's languages are listed in
+  the language file in its folder (`english.txt` in an English copy: English, French and
+  Italian); Sahin renames that file as the game starts. Blur has no Turkish; a language
+  your copy doesn't have leaves it as it is.
 
 ## What you need
 

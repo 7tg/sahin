@@ -10,6 +10,7 @@
 #include "third_party/yyjson/yyjson.h"
 #include "library/sha256_hex.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -643,6 +644,111 @@ bool apply_ini(const InstallPlan &plan, const InstallPaths &paths, std::string &
             return false;
         }
     }
+    return true;
+}
+
+namespace
+{
+// The languages Blur.exe names, as marker files spell them.
+constexpr const char *kMarkerLanguages[] = {"english", "french", "italian", "german", "spanish",
+                                            "polish", "russian", "czech", "hungarian", "japanese",
+                                            "korean"};
+
+bool marker_named(const std::string &name, std::string *language)
+{
+    for (const char *known : kMarkerLanguages)
+        if (strcasecmp(name.c_str(), (std::string(known) + ".txt").c_str()) == 0)
+        {
+            if (language)
+                *language = known;
+            return true;
+        }
+    return false;
+}
+} // namespace
+
+std::string marker_language(int system_language)
+{
+    switch (system_language)
+    {
+    case 0: return "japanese";
+    case 1: case 18: return "english"; // US, UK
+    case 2: case 22: return "french";  // France, Canada
+    case 3: case 20: return "spanish"; // Spain, Latin America
+    case 4: return "german";
+    case 5: return "italian";
+    case 8: return "russian";
+    case 9: return "korean";
+    case 16: return "polish";
+    case 23: return "czech";
+    case 24: return "hungarian";
+    default: return "";
+    }
+}
+
+std::vector<std::string> marker_languages(std::string_view text)
+{
+    std::vector<std::string> languages;
+    std::string word;
+    for (std::size_t i = 0; i <= text.size(); ++i)
+    {
+        const char c = i < text.size() ? text[i] : ' ';
+        if (std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '_')
+        {
+            word += c;
+            continue;
+        }
+        std::string language;
+        if (marker_named(word, &language) &&
+            std::find(languages.begin(), languages.end(), language) == languages.end())
+            languages.push_back(language);
+        word.clear();
+    }
+    return languages;
+}
+
+bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, int system_language,
+                           std::string &done, std::string &error)
+{
+    std::string games;
+    if (!resolve(paths.win_root + "/prefixes/" + plan.prefix, "drive_c/Games", false, games) ||
+        !is_directory(games + "/" + plan.game))
+    {
+        error = plan.title + " isn't installed in " + plan.prefix;
+        return false;
+    }
+    const std::string folder = games + "/" + plan.game;
+    std::vector<std::pair<std::string, std::string>> markers; // file name, its language
+    for (const auto &name : names_in(folder))
+        if (std::string language; marker_named(name, &language) && is_file(folder + "/" + name))
+            markers.emplace_back(name, language);
+    const std::string wanted = marker_language(system_language);
+    if (markers.size() != 1)
+    {
+        done = markers.empty() ? "no language file" : "more than one language file, left alone";
+        return true;
+    }
+    const auto &[name, current] = markers.front();
+    std::string text;
+    hui::save::read_file(folder + "/" + name, &text, 4096);
+    const auto offered = marker_languages(text);
+    if (wanted.empty() || std::find(offered.begin(), offered.end(), wanted) == offered.end())
+    {
+        done = "system language " + std::to_string(system_language) + " isn't one this copy has; " +
+               current + " kept";
+        return true;
+    }
+    if (wanted == current)
+    {
+        done = current + " already";
+        return true;
+    }
+    if (rename((folder + "/" + name).c_str(), (folder + "/" + wanted + ".txt").c_str()) != 0)
+    {
+        error = "Can't rename " + name + " to " + wanted + ".txt: " + std::strerror(errno);
+        return false;
+    }
+    done = current + " -> " + wanted;
     return true;
 }
 

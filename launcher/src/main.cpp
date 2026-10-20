@@ -61,12 +61,14 @@ static constexpr const char *kSingleGame = BLACKBOX_TEXT(BLACKBOX_GAME);
 static constexpr const char *kSingleGame = "";
 #endif
 extern "C" int sceSystemServiceLoadExec(const char *path, const char **arguments);
+extern "C" int sceSystemServiceParamGetInt(int id, int *value);
 
 namespace
 {
-// The game is installed for this app: its install record is there, for the prefix the settings
-// install into (the plan's when they name none).
-bool single_game_installed(const std::string &app_root, const std::string &storage_root)
+// This app's game's plan, for the prefix the settings install into (the plan's when they name
+// none). False when there is none.
+bool single_game_plan(const std::string &app_root, const std::string &storage_root,
+                      store::library::InstallPlan &out)
 {
     std::string saved, error;
     hui::save::read_file(storage_root + "/settings.txt", &saved, 4096);
@@ -81,13 +83,39 @@ bool single_game_installed(const std::string &app_root, const std::string &stora
         store::library::InstallOptions options;
         if (!settings.game_prefix.empty() && settings.game_prefix != plan.prefix)
             options.prefix = settings.game_prefix;
-        struct stat info{};
-        return stat(store::library::record_path(store::library::effective_plan(plan, options),
-                                                {storage_root, "/data/prospero-win"})
-                        .c_str(),
-                    &info) == 0;
+        out = store::library::effective_plan(plan, options);
+        return true;
     }
     return false;
+}
+
+// The game is installed for this app: its install record is there.
+bool single_game_installed(const std::string &app_root, const std::string &storage_root)
+{
+    store::library::InstallPlan plan;
+    struct stat info{};
+    return single_game_plan(app_root, storage_root, plan) &&
+           stat(store::library::record_path(plan, {storage_root, "/data/prospero-win"}).c_str(),
+                &info) == 0;
+}
+
+// The game in the PS5's language, when the copy has it (store::library::apply_system_language),
+// at every start: the system setting may have changed since the last.
+void apply_system_language(const std::string &app_root, const std::string &storage_root)
+{
+    constexpr int kParamLanguage = 1; // SCE_SYSTEM_SERVICE_PARAM_ID_LANG
+    int language = -1;
+    store::library::InstallPlan plan;
+    std::string done, error;
+    if (const int rc = sceSystemServiceParamGetInt(kParamLanguage, &language); rc != 0)
+        hui::sys::log("[STORE] language: system language unread rc=0x%08x", static_cast<unsigned>(rc));
+    else if (!single_game_plan(app_root, storage_root, plan))
+        hui::sys::log("[STORE] language: no plan");
+    else if (!store::library::apply_system_language(plan, {storage_root, "/data/prospero-win"},
+                                                    language, done, error))
+        hui::sys::log("[STORE] language: %s", error.c_str());
+    else
+        hui::sys::log("[STORE] language: system %d, %s", language, done.c_str());
 }
 
 // What the game's in-game menu left for this start: <data>/ingame-<title>.txt, taken (renamed
@@ -183,6 +211,7 @@ std::string return_request()
 [[noreturn]] void play_single_game(const char *why)
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
+    apply_system_language(store::system::app_folder(), "/data/sahin");
     const std::string request = return_request();
     // The start record first, then the request only if the record is there: a request left
     // without a record would bring the launcher back to play the game again. Without the

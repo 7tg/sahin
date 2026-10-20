@@ -128,6 +128,20 @@ InstallPlan effective_plan(const InstallPlan &plan, const InstallOptions &option
 // edits an ini (the cursor). False with error set when the game or one of its files is missing.
 bool apply_ini(const InstallPlan &plan, const InstallPaths &paths, std::string &error);
 
+// Blur plays in the language its folder's marker file names (english.txt, french.txt, ...);
+// the marker's text lists the names that copy has ("rename this file to either: english.txt
+// french.txt italian.txt"). A PS5 system language (sceSystemServiceParamGetInt's LANG) in a
+// marker's words, "" for one Blur has none of (Turkish, Dutch, ...).
+std::string marker_language(int system_language);
+// The languages a marker's text offers, in its order, lower case.
+std::vector<std::string> marker_languages(std::string_view text);
+// The installed game's marker renamed to the system language, when it offers that language.
+// Nothing changes when it doesn't, when the folder has no marker or more than one, or when the
+// marker already says so. done says what happened, for the log. False with error set when the
+// game isn't installed or the rename fails.
+bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, int system_language,
+                           std::string &done, std::string &error);
+
 // The plan's user files (install_plan.hpp) edited in each Windows user's folder of its prefix
 // that holds them, to the plan's profile size: after an install writes the profile, and when a
 // settings change writes it again. A file the game hasn't written yet is left for later; none

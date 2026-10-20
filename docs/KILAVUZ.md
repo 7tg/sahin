@@ -73,6 +73,10 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
 - **Titreşim:** Blur istediğinde kumanda titrer; L2 ve R2 tetikleri de onunla birlikte
   titrer. Tetiklerdeki etkiyi PS5 ayarlarındaki tetik efekti yoğunluğu ile azaltabilir ya
   da kapatabilirsiniz.
+- **Dil:** kopyanızda varsa Blur PS5'in dilinde açılır. Kopyanın dilleri klasöründeki dil
+  dosyasında yazar (İngilizce kopyada `english.txt`: İngilizce, Fransızca ve İtalyanca);
+  Sahin oyun açılırken bu dosyanın adını değiştirir. Blur'un Türkçesi yoktur; kopyanızda
+  olmayan bir dil seçiliyse oyunun dili değişmez.
 
 ## Bölünmüş ekran
 
