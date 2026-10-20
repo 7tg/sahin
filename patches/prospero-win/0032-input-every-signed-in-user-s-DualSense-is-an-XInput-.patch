@@ -1,0 +1,670 @@
+From 83e112af9c2e5e0c0f555af93a8284d6dcaf21b1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?= <20913374+7tg@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 12:00:00 +0300
+Subject: [PATCH] input: every signed-in user's DualSense is an XInput
+ controller
+
+prospero-win read one DualSense, the foreground user's, as XInput
+controller 0, so a game's local multiplayer (Blur's split screen) never
+saw a second player. The title now also opens the pads of the other
+signed-in users (sceUserServiceGetLoginUserIdList), up to three, as
+controllers 1..3: a user keeps a slot while signed in, one who signs in
+during the game is found within two seconds, one who signs out frees it.
+
+- native/pw_pad_ps5: PwPadPlayers, pw_pad_players_scan/_close, and the
+  login_users op (optional).
+- wine/ps5/pw_wine_sink: four pads and rumbles, pw_wine_set_pad_at,
+  pw_wine_pad_at, pw_wine_set_rumble_at, pw_wine_rumble_at; the old
+  calls are controller 0's. ntdll.prx exports them.
+- wine/patches/0471: xinput reads controllers 0..3 through them.
+- wine64: reads the players' pads every frame and passes each one's
+  rumble on. Bindings, the pointer and Options+Touchpad stay player 1's.
+---
+ PUBLICATION_ALLOWLIST.txt                     |   1 +
+ native/pw_pad_ps5.c                           |  71 +++++++-
+ native/pw_pad_ps5.h                           |  17 +-
+ native/wine64_main.c                          |  34 ++++
+ tests/test_pw_pad_ps5.c                       |  54 +++++-
+ tests/test_pw_wine_sink.c                     |  17 ++
+ tools/build_wine_ps5.sh                       |   1 +
+ .../0471-xinput-ps5-four-controllers.patch    | 164 ++++++++++++++++++
+ wine/ps5/pw_wine_sink.c                       |  45 +++--
+ wine/ps5/pw_wine_sink.h                       |  10 ++
+ 10 files changed, 390 insertions(+), 24 deletions(-)
+ create mode 100644 wine/patches/0471-xinput-ps5-four-controllers.patch
+
+diff --git a/PUBLICATION_ALLOWLIST.txt b/PUBLICATION_ALLOWLIST.txt
+index ba650ad..e25a352 100644
+--- a/PUBLICATION_ALLOWLIST.txt
++++ b/PUBLICATION_ALLOWLIST.txt
+@@ -210,6 +210,7 @@ wine/patches/0456-win32u-vulkan-keep-swapchain-chain-when-scaling.patch
+ wine/patches/0457-win32u-vulkan-placed-map-properties-khr.patch
+ wine/patches/0460-win32u-ps5-driver-vulkan-display-plane.patch
+ wine/patches/0470-xinput-ps5-title-controller.patch
++wine/patches/0471-xinput-ps5-four-controllers.patch
+ wine/patches/0560-ntdll-stderr-output-sink.patch
+ wine/patches/0570-ntdll-ps5-reserve-virtual-range.patch
+ wine/patches/0580-ntdll-ps5-config-dir-parent-ownership.patch
+diff --git a/native/pw_pad_ps5.c b/native/pw_pad_ps5.c
+index 74fa4c2..d8302ff 100644
+--- a/native/pw_pad_ps5.c
++++ b/native/pw_pad_ps5.c
+@@ -19,6 +19,7 @@ extern int scePadOpen(int32_t,int32_t,int32_t,const void *);
+ extern int scePadRead(int32_t,PwPadPs5Data *,int32_t);
+ extern int scePadClose(int32_t);
+ extern int scePadSetVibration(int32_t,const uint8_t *);
++extern int sceUserServiceGetLoginUserIdList(int32_t *);
+ static int platform_user_initialize(const void *p){return sceUserServiceInitialize(p);}
+ static int platform_foreground_user(int32_t *u){return sceUserServiceGetForegroundUser(u);}
+ static int platform_user_terminate(void){return sceUserServiceTerminate();}
+@@ -29,6 +30,15 @@ static int platform_pad_read(int32_t h,PwPadPs5Data *s,int32_t n)
+ {return scePadRead(h,s,n);}
+ static int platform_pad_close(int32_t h){return scePadClose(h);}
+ static int platform_pad_set_vibration(int32_t h,const uint8_t m[2]){return scePadSetVibration(h,m);}
++static int platform_login_users(int32_t users[PW_PAD_PS5_USERS])
++{
++    /* SceUserServiceLoginUserIdList is PW_PAD_PS5_USERS ids; the room past
++     * it only guards against a longer list. */
++    int32_t list[16];
++    for(size_t i=0;i<sizeof(list)/sizeof(list[0]);i++)list[i]=-1;
++    int rc=sceUserServiceGetLoginUserIdList(list);
++    memcpy(users,list,PW_PAD_PS5_USERS*sizeof(*users));return rc;
++}
+ #endif
+ 
+ int pw_pad_ps5_platform_ops(PwPadPs5Ops *ops)
+@@ -39,7 +49,8 @@ int pw_pad_ps5_platform_ops(PwPadPs5Ops *ops)
+ #else
+     *ops=(PwPadPs5Ops){platform_user_initialize,platform_foreground_user,
+         platform_user_terminate,platform_pad_init,platform_pad_open,
+-        platform_pad_read,platform_pad_close,platform_pad_set_vibration};return PW_OK;
++        platform_pad_read,platform_pad_close,platform_pad_set_vibration,
++        platform_login_users};return PW_OK;
+ #endif
+ }
+ 
+@@ -147,3 +158,61 @@ int pw_pad_ps5_vibrate(PwPadPs5 *pad,uint8_t large,uint8_t small)
+     pad->vibration_rc=pad->ops.pad_set_vibration(pad->pad_handle,motors);
+     return pad->vibration_rc<0?PW_ERR_STATE:PW_OK;
+ }
++
++void pw_pad_players_init(PwPadPlayers *players)
++{
++    if(!players)return;
++    memset(players,0,sizeof(*players));
++    for(int i=0;i<PW_PAD_PLAYERS;i++){players->slot[i].user_id=-1;players->slot[i].pad_handle=-1;}
++}
++
++static int signed_in(const int32_t users[PW_PAD_PS5_USERS],int32_t user)
++{
++    for(int i=0;i<PW_PAD_PS5_USERS;i++)if(users[i]==user)return 1;
++    return 0;
++}
++
++/* Another user's pad: the user service and scePadInit are the title pad's. */
++static int open_player(PwPadPs5 *pad,const PwPadPs5 *title_pad,int32_t user)
++{
++    memset(pad,0,sizeof(*pad));pad->ops=title_pad->ops;pad->user_id=user;
++    pad->close_rc=INT_MIN;pad->terminate_rc=INT_MIN;
++    if(pw_pad_init(&pad->core,title_pad->core.map,title_pad->core.map_count)!=PW_OK)goto failed;
++    pad->pad_handle=pad->ops.pad_open(user,0,0,NULL);
++    if(pad->pad_handle<0)goto failed;
++    pad->opened=1;centre_analog(pad);return 1;
++failed:
++    pad->user_id=-1;pad->pad_handle=-1;return 0;
++}
++
++int pw_pad_players_scan(PwPadPlayers *players,const PwPadPs5 *title_pad)
++{
++    int open=0;
++    if(!players || !title_pad)return 0;
++    int32_t users[PW_PAD_PS5_USERS];
++    if(title_pad->opened && title_pad->ops.login_users &&
++       title_pad->ops.login_users(users)>=0) {
++        for(int i=0;i<PW_PAD_PLAYERS;i++) {
++            PwPadPs5 *pad=&players->slot[i];
++            if(pad->opened && !signed_in(users,pad->user_id)) {
++                (void)pw_pad_ps5_close(pad);pad->user_id=-1;
++            }
++        }
++        for(int u=0;u<PW_PAD_PS5_USERS;u++) {
++            int32_t user=users[u];int known=user<0 || user==title_pad->user_id;
++            for(int i=0;!known && i<PW_PAD_PLAYERS;i++)
++                known=players->slot[i].opened && players->slot[i].user_id==user;
++            for(int i=0;!known && i<PW_PAD_PLAYERS;i++)
++                if(!players->slot[i].opened){(void)open_player(&players->slot[i],title_pad,user);known=1;}
++        }
++    }
++    for(int i=0;i<PW_PAD_PLAYERS;i++)open+=players->slot[i].opened!=0;
++    return open;
++}
++
++void pw_pad_players_close(PwPadPlayers *players)
++{
++    if(!players)return;
++    for(int i=0;i<PW_PAD_PLAYERS;i++)
++        if(players->slot[i].opened){(void)pw_pad_ps5_close(&players->slot[i]);players->slot[i].user_id=-1;}
++}
+diff --git a/native/pw_pad_ps5.h b/native/pw_pad_ps5.h
+index 302d057..e7f4dd7 100644
+--- a/native/pw_pad_ps5.h
++++ b/native/pw_pad_ps5.h
+@@ -4,7 +4,7 @@
+ #include "../src/pw_pad.h"
+ #include <stdint.h>
+ 
+-enum { PW_PAD_PS5_BATCH=64 };
++enum { PW_PAD_PS5_BATCH=64,PW_PAD_PS5_USERS=4,PW_PAD_PLAYERS=PW_PAD_PS5_USERS-1 };
+ typedef struct PwPadPs5Stick { uint8_t x,y; } PwPadPs5Stick;
+ typedef struct PwPadPs5Touch { uint16_t x,y;uint8_t finger,reserved[3]; } PwPadPs5Touch;
+ typedef struct PwPadPs5TouchData {
+@@ -27,6 +27,9 @@ typedef struct PwPadPs5Ops {
+     int (*pad_close)(int32_t);
+     /* Optional: scePadSetVibration(handle, {large, small}), NULL if none. */
+     int (*pad_set_vibration)(int32_t,const uint8_t motors[2]);
++    /* Optional: the signed-in users (sceUserServiceGetLoginUserIdList), -1
++     * for an empty place; NULL if none. */
++    int (*login_users)(int32_t users[PW_PAD_PS5_USERS]);
+ } PwPadPs5Ops;
+ 
+ typedef struct PwPadPs5 {
+@@ -56,4 +59,16 @@ int pw_pad_ps5_close(PwPadPs5 *);
+  * when the call fails (its result is kept in vibration_rc). */
+ int pw_pad_ps5_vibrate(PwPadPs5 *,uint8_t large,uint8_t small);
+ 
++/* The other signed-in users' DualSenses, for local multiplayer: slot i is
++ * XInput controller i+1, the title's own user's pad being controller 0. A
++ * user keeps a slot while signed in; one signing in takes the first free
++ * slot. Their pads are read with pw_pad_ps5_read, as the title's. */
++typedef struct PwPadPlayers { PwPadPs5 slot[PW_PAD_PLAYERS]; } PwPadPlayers;
++void pw_pad_players_init(PwPadPlayers *);
++/* Opens the pads of users who signed in, closes those of users who signed
++ * out, with the title's open pad's ops; the number of open slots. A failed
++ * sign-in list changes nothing. */
++int pw_pad_players_scan(PwPadPlayers *,const PwPadPs5 *title_pad);
++void pw_pad_players_close(PwPadPlayers *);
++
+ #endif
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index ef728d8..354eb6d 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -1006,6 +1006,7 @@ int main(int argc, char **argv)
+     static PwWineStart start;
+     static PwVideoOutPs5 video;
+     static PwPadPs5 pad;
++    static PwPadPlayers players;
+     static PwHidPs5 hid;
+     static PwGameInput game_input;
+     const PwGameProfile *game = NULL;
+@@ -1014,6 +1015,9 @@ int main(int argc, char **argv)
+     int (*post_input)(const PwWineInput *) = NULL;
+     void (*set_pad)(const PwWinePad *) = NULL;
+     int (*rumble)(uint32_t *, uint32_t *) = NULL;
++    void (*set_pad_at)(uint32_t, const PwWinePad *) = NULL;
++    int (*rumble_at)(uint32_t, uint32_t *, uint32_t *) = NULL;
++    int players_open = 0;
+     uint64_t vibrations = 0;
+     uint64_t shown_sequence = 0, shown = 0, posted = 0, refused = 0;
+     VulkanFrames vulkan_frames = { 0 };
+@@ -1255,12 +1259,22 @@ int main(int argc, char **argv)
+                 (uintptr_t)pw_prx_lookup(start.descriptor, "pw_wine_set_pad");
+             rumble = (int (*)(uint32_t *, uint32_t *))
+                 (uintptr_t)pw_prx_lookup(start.descriptor, "pw_wine_rumble");
++            /* The other signed-in users' DualSenses: controllers 1..3. */
++            set_pad_at = (void (*)(uint32_t, const PwWinePad *))
++                (uintptr_t)pw_prx_lookup(start.descriptor, "pw_wine_set_pad_at");
++            rumble_at = (int (*)(uint32_t, uint32_t *, uint32_t *))
++                (uintptr_t)pw_prx_lookup(start.descriptor, "pw_wine_rumble_at");
+         }
+         video_status = pw_videoout_ps5_open(&video);
+         pad_status = pw_pad_ps5_platform_ops(&pad_ops);
+         if (pad_status == PW_OK)
+             pad_status = pw_pad_ps5_open(&pad, &pad_ops, pad_open_map,
+                                          sizeof(pad_open_map) / sizeof(pad_open_map[0]));
++        pw_pad_players_init(&players);
++        if (pad_status == PW_OK && set_pad_at) {
++            players_open = pw_pad_players_scan(&players, &pad);
++            PS5LOG_LOG("PW_WINE64 players=%d", players_open);
++        }
+         /* A USB keyboard and mouse, the foreground user's, as the pad's. */
+         if (post_input) {
+             int32_t user = pad_status == PW_OK ? pad.user_id : -1;
+@@ -1407,6 +1421,26 @@ int main(int argc, char **argv)
+ #endif
+             if (pad_read || scripted) set_pad(connected ? &state : NULL);
+         }
++        /* XInput controllers 1..3: the other signed-in users' DualSenses. A
++         * user who signs in during the game is found within two seconds. */
++        if (set_pad_at && pad_status == PW_OK) {
++            if (tick % (2 * PW_WINE64_TICKS_PER_S) == 0) {
++                int open = pw_pad_players_scan(&players, &pad);
++                if (open != players_open)
++                    PS5LOG_LOG("PW_WINE64 players=%d", open);
++                players_open = open;
++            }
++            for (uint32_t i = 0; i < PW_PAD_PLAYERS; i++) {
++                PwPadPs5 *player = &players.slot[i];
++                PwWinePad state;
++                int read = player->opened && pw_pad_ps5_read(player) == PW_OK;
++                uint32_t left, right;
++
++                set_pad_at(i + 1, pw_wine_game_pad(read ? player : NULL, &state) ? &state : NULL);
++                if (rumble_at && rumble_at(i + 1, &left, &right) == 1 && player->opened)
++                    (void)pw_pad_ps5_vibrate(player, (uint8_t)(left >> 8), (uint8_t)(right >> 8));
++            }
++        }
+         if (pad_read) {
+             size_t count = pw_wine_game_inputs(&game_input, pad.core.pressed_edges,
+                                                pad.core.released_edges, events,
+diff --git a/tests/test_pw_pad_ps5.c b/tests/test_pw_pad_ps5.c
+index 4ab3ada..8feef43 100644
+--- a/tests/test_pw_pad_ps5.c
++++ b/tests/test_pw_pad_ps5.c
+@@ -9,22 +9,68 @@ static int user_initialize(const void *p){assert(!p);init_calls++;return user_in
+ static int foreground(int32_t *u){foreground_calls++;*u=42;return 0;}
+ static int terminate(void){terminate_calls++;return 0;}
+ static int pad_init(void){pad_init_calls++;return 0;}
++/* The foreground user 42's pad is handle 7; another user's is 100+user. */
+ static int pad_open(int32_t u,int32_t t,int32_t i,const void *p)
+-{assert(u==42&&!t&&!i&&!p);open_calls++;return 7;}
++{assert(!t&&!i&&!p);open_calls++;return u==42?7:100+u;}
++static PwPadPs5Data other[64];static int other_count;
+ static int pad_read(int32_t h,PwPadPs5Data *s,int32_t n)
+-{assert(h==7&&n==64);read_calls++;if(read_rc<0)return read_rc;
++{assert(n==64);read_calls++;if(h!=7){memcpy(s,other,(size_t)other_count*sizeof(*s));return other_count;}
++ if(read_rc<0)return read_rc;
+  memcpy(s,fixture,(size_t)fixture_count*sizeof(*s));return fixture_count;}
+-static int pad_close(int32_t h){assert(h==7);close_calls++;return 0;}
++static int closed_handles[16],closed_count;
++static int pad_close(int32_t h){if(h==7)close_calls++;else closed_handles[closed_count++]=h;return 0;}
++static int32_t logged_in[4]={42,-1,-1,-1};static int login_rc,login_calls;
++static int login_users(int32_t users[4]){login_calls++;memcpy(users,logged_in,sizeof(logged_in));return login_rc;}
+ static int vibration_calls,vibration_rc;static uint8_t motors_seen[2];
+ static int pad_set_vibration(int32_t h,const uint8_t m[2])
+ {assert(h==7);vibration_calls++;memcpy(motors_seen,m,2);return vibration_rc;}
+ static const PwPadPs5Ops ops={user_initialize,foreground,terminate,pad_init,pad_open,pad_read,pad_close,
+-                              pad_set_vibration};
++                              pad_set_vibration,login_users};
++
+ enum { CREATE=0x1,L1=0x400 };
+ static const PwPadKeyMap map[]={{L1,'Z',0,0,"left-flipper"}};
+ 
++/* The other signed-in users' pads: opened in sign-in order, kept in their
++ * slot, closed when the user signs out; the title's own user is never one. */
++static void test_players(void)
++{
++    PwPadPs5 main_pad;PwPadPlayers players;
++    assert(pw_pad_ps5_open(&main_pad,&ops,map,1)==PW_OK);
++    pw_pad_players_init(&players);
++    assert(pw_pad_players_scan(&players,&main_pad)==0 && !players.slot[0].opened);
++    memcpy(logged_in,(int32_t[4]){5,42,9,-1},sizeof(logged_in));
++    assert(pw_pad_players_scan(&players,&main_pad)==2);
++    assert(players.slot[0].opened && players.slot[0].user_id==5 && players.slot[0].pad_handle==105);
++    assert(players.slot[1].opened && players.slot[1].user_id==9 && !players.slot[2].opened);
++    assert(!players.slot[0].owns_user_service);
++    int opens=open_calls;
++    assert(pw_pad_players_scan(&players,&main_pad)==2 && open_calls==opens);  /* already open */
++    /* 5 signs out: 9 keeps slot 1, a new user takes the free slot 0. */
++    memcpy(logged_in,(int32_t[4]){42,9,-1,-1},sizeof(logged_in));
++    assert(pw_pad_players_scan(&players,&main_pad)==1 && !players.slot[0].opened &&
++           closed_count==1 && closed_handles[0]==105 && players.slot[1].user_id==9);
++    memcpy(logged_in,(int32_t[4]){42,9,3,-1},sizeof(logged_in));
++    assert(pw_pad_players_scan(&players,&main_pad)==2 && players.slot[0].user_id==3);
++    /* Reads: a connected pad's state, as for the title's own. */
++    other[0]=(PwPadPs5Data){.buttons=0x4000,.left_stick={1,2},.connected=1,.timestamp=10,.connected_count=1};
++    other_count=1;
++    assert(pw_pad_ps5_read(&players.slot[1])==PW_OK && players.slot[1].core.connected &&
++           players.slot[1].core.previous_buttons==0x4000 && players.slot[1].left_stick.x==1);
++    other_count=0;
++    /* A failed sign-in list changes nothing; no list op, no players. */
++    login_rc=-1;assert(pw_pad_players_scan(&players,&main_pad)==2);login_rc=0;
++    PwPadPs5 bare=main_pad;bare.ops.login_users=NULL;
++    PwPadPlayers none;pw_pad_players_init(&none);
++    assert(pw_pad_players_scan(&none,&bare)==0);
++    pw_pad_players_close(&players);
++    assert(!players.slot[0].opened && !players.slot[1].opened && closed_count==3);
++    memcpy(logged_in,(int32_t[4]){42,-1,-1,-1},sizeof(logged_in));
++    assert(pw_pad_ps5_close(&main_pad)==PW_OK);
++    open_calls=close_calls=terminate_calls=init_calls=foreground_calls=pad_init_calls=0;
++}
+ int main(void)
+ {
++    test_players();
+     PwPadPs5 pad;
+     assert(pw_pad_ps5_open(&pad,&ops,map,1)==PW_OK && pad.opened && pad.pad_handle==7);
+     assert(pad.left_stick.x==0x80 && pad.right_stick.y==0x80 && !pad.l2 && !pad.r2);
+diff --git a/tests/test_pw_wine_sink.c b/tests/test_pw_wine_sink.c
+index 33ec489..595f01d 100644
+--- a/tests/test_pw_wine_sink.c
++++ b/tests/test_pw_wine_sink.c
+@@ -266,6 +266,23 @@ int main(void)
+     pw_wine_set_rumble(1000,0xffff);assert(!pw_wine_rumble(NULL,NULL));  /* unchanged */
+     pw_wine_set_rumble(0x10000,0);assert(pw_wine_rumble(NULL,&right)==1 && right==0);
+     assert(!pw_wine_rumble(&left,NULL) && left==0xffff);
++
++    /* Controllers 1..3: their own state, packets and rumble; 0 is the pad above. */
++    PwWinePad second=pad;second.buttons=0x4000;
++    assert(!pw_wine_pad_at(1,&got) && got.connected==0);
++    pw_wine_set_pad_at(1,&second);
++    assert(pw_wine_pad_at(1,&got) && got.packet==1 && got.buttons==0x4000);
++    assert(pw_wine_pad_at(0,&got) && got.packet==9 && got.thumb_ry==4);
++    assert(!pw_wine_pad_at(2,&got) && !pw_wine_pad_at(3,&got));
++    pw_wine_set_pad_at(1,NULL);assert(!pw_wine_pad_at(1,&got));
++    assert(pw_wine_pad(&got) && got.packet==9);
++    pw_wine_set_rumble_at(3,500,600);
++    assert(!pw_wine_rumble(&left,&right) && !pw_wine_rumble_at(1,&left,&right));
++    assert(pw_wine_rumble_at(3,&left,&right)==1 && left==500 && right==600);
++    /* No controller past the fourth. */
++    pw_wine_set_pad_at(PW_WINE_PADS,&second);pw_wine_set_rumble_at(PW_WINE_PADS,1,1);
++    assert(!pw_wine_pad_at(PW_WINE_PADS,&got) && got.connected==0);
++    assert(!pw_wine_rumble_at(PW_WINE_PADS,&left,&right));
+     test_display_release();
+     return 0;
+ }
+diff --git a/tools/build_wine_ps5.sh b/tools/build_wine_ps5.sh
+index d4efd88..1f553be 100755
+--- a/tools/build_wine_ps5.sh
++++ b/tools/build_wine_ps5.sh
+@@ -406,6 +406,7 @@ if [ "$prx_status" = 0 ]; then
+         pw_wine_set_present_sink pw_wine_post_input pw_wine_sink_stats \
+         pw_wine_present pw_wine_next_input pw_wine_input_fd \
+         pw_wine_set_pad pw_wine_rumble pw_wine_pad pw_wine_set_rumble \
++        pw_wine_set_pad_at pw_wine_rumble_at pw_wine_pad_at pw_wine_set_rumble_at \
+         pw_wine_set_audio_sink pw_wine_audio_available pw_wine_audio_output \
+         __wine_virtual_stats __wine_virtual_fault_top __wine_ps5_set_output_sink __wine_ps5_memory_stats pw_cwd_set \
+         __wine_ps5_set_segv_hook __wine_ps5_set_segv_unresolved_hook pw_wine_set_display_release pw_wine_release_display \
+diff --git a/wine/patches/0471-xinput-ps5-four-controllers.patch b/wine/patches/0471-xinput-ps5-four-controllers.patch
+new file mode 100644
+index 0000000..3a95a5e
+--- /dev/null
++++ b/wine/patches/0471-xinput-ps5-four-controllers.patch
+@@ -0,0 +1,164 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: prospero-win <prospero-win@invalid>
++Date: Tue, 20 Oct 2026 12:00:00 +0300
++Subject: [PATCH] xinput: Read the PS5 title's four controllers.
++
++Patch 0470 made controller 0 the title's DualSense. The title now also
++reads the other signed-in users' DualSenses and keeps each one's state
++and rumble in its sink by index (pw_wine_pad_at, pw_wine_set_rumble_at in
++ntdll.prx), so local multiplayer sees one XInput controller per player:
++- the Unix calls take the controller index, 0..3;
++- XInputGetState(Ex), XInputGetKeystroke and XInputGetCapabilities(Ex)
++  report each index the title has a connected pad for;
++- XInputSetState keeps each controller's rumble, and XInputEnable passes
++  all four on.
++---
++ dlls/xinput1_3/main.c    | 25 +++++++++++++++----------
++ dlls/xinput1_3/unixlib.c | 15 ++++++++-------
++ dlls/xinput1_3/unixlib.h |  8 ++++++++
++ 3 files changed, 31 insertions(+), 17 deletions(-)
++
++diff --git a/dlls/xinput1_3/main.c b/dlls/xinput1_3/main.c
++index 83cee15..9fd167b 100644
++--- a/dlls/xinput1_3/main.c
+++++ b/dlls/xinput1_3/main.c
++@@ -110,7 +110,7 @@ static XINPUT_STATE current_state[XUSER_MAX_COUNT];
++  * xinput uses HID. */
++ static unixlib_handle_t title_pad;
++ static BOOL title_pad_enabled = TRUE;
++-static XINPUT_VIBRATION title_pad_vibration;
+++static XINPUT_VIBRATION title_pad_vibration[XUSER_MAX_COUNT];
++ 
++ static BOOL WINAPI find_title_pad(INIT_ONCE *once, void *param, void **context)
++ {
++@@ -130,7 +130,7 @@ static BOOL WINAPI find_title_pad(INIT_ONCE *once, void *param, void **context)
++         __wine_unload_unix_lib(module);
++         return TRUE;
++     }
++-    TRACE("controller 0 is the title's\n");
+++    TRACE("controllers 0-3 are the title's\n");
++     title_pad = handle;
++     return TRUE;
++ }
++@@ -144,9 +144,13 @@ static BOOL has_title_pad(void)
++ 
++ static BOOL title_pad_state(DWORD index, XINPUT_STATE *state)
++ {
++-    struct xinput_pad_state pad = {0};
+++    struct xinput_pad_params params = {0};
+++    struct xinput_pad_state pad;
++ 
++-    if (index || __wine_unix_call(title_pad, unix_pad_state, &pad) || !pad.connected) return FALSE;
+++    params.index = index;
+++    if (index >= XUSER_MAX_COUNT || __wine_unix_call(title_pad, unix_pad_state, &params) ||
+++        !params.state.connected) return FALSE;
+++    pad = params.state;
++     memset(state, 0, sizeof(*state));
++     state->dwPacketNumber = pad.packet;
++     if (!title_pad_enabled) return TRUE;  /* XInputEnable(FALSE): neutral, still connected */
++@@ -161,14 +165,15 @@ static BOOL title_pad_state(DWORD index, XINPUT_STATE *state)
++ }
++ 
++ /* xinput_cs must be held */
++-static void title_pad_rumble(void)
+++static void title_pad_rumble(DWORD index)
++ {
++     struct xinput_rumble_params params = {0};
++ 
+++    params.index = index;
++     if (title_pad_enabled)
++     {
++-        params.left = title_pad_vibration.wLeftMotorSpeed;
++-        params.right = title_pad_vibration.wRightMotorSpeed;
+++        params.left = title_pad_vibration[index].wLeftMotorSpeed;
+++        params.right = title_pad_vibration[index].wRightMotorSpeed;
++     }
++     __wine_unix_call(title_pad, unix_pad_rumble, &params);
++ }
++@@ -894,7 +899,7 @@ void WINAPI DECLSPEC_HOTPATCH XInputEnable(BOOL enable)
++     {
++         EnterCriticalSection(&xinput_cs);
++         title_pad_enabled = enable;
++-        title_pad_rumble();
+++        for (DWORD index = 0; index < XUSER_MAX_COUNT; index++) title_pad_rumble(index);
++         LeaveCriticalSection(&xinput_cs);
++         return;
++     }
++@@ -923,8 +928,8 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION *vib
++         if (index >= XUSER_MAX_COUNT) return ERROR_BAD_ARGUMENTS;
++         if (!title_pad_state(index, &state)) return ERROR_DEVICE_NOT_CONNECTED;
++         EnterCriticalSection(&xinput_cs);
++-        title_pad_vibration = *vibration;
++-        title_pad_rumble();
+++        title_pad_vibration[index] = *vibration;
+++        title_pad_rumble(index);
++         LeaveCriticalSection(&xinput_cs);
++         return ERROR_SUCCESS;
++     }
++diff --git a/dlls/xinput1_3/unixlib.c b/dlls/xinput1_3/unixlib.c
++index 54488c8..f45becc 100644
++--- a/dlls/xinput1_3/unixlib.c
+++++ b/dlls/xinput1_3/unixlib.c
++@@ -37,22 +37,23 @@
++  * HID stack. The title keeps its controller's state in its sink
++  * (wine/ps5/pw_wine_sink.h), whose calls ntdll exports; anywhere else they
++  * are missing and xinput uses HID. */
++-static int (*title_pad)( struct xinput_pad_state *state );
++-static void (*title_rumble)( UINT32 left, UINT32 right );
+++static int (*title_pad)( UINT32 index, struct xinput_pad_state *state );
+++static void (*title_rumble)( UINT32 index, UINT32 left, UINT32 right );
++ 
+++/* Every signed-in user's DualSense, controllers 0..3. */
++ static NTSTATUS pad_init( void *args )
++ {
++-    title_pad = dlsym( RTLD_DEFAULT, "pw_wine_pad" );
++-    title_rumble = dlsym( RTLD_DEFAULT, "pw_wine_set_rumble" );
+++    title_pad = dlsym( RTLD_DEFAULT, "pw_wine_pad_at" );
+++    title_rumble = dlsym( RTLD_DEFAULT, "pw_wine_set_rumble_at" );
++     return title_pad ? STATUS_SUCCESS : STATUS_NOT_SUPPORTED;
++ }
++ 
++ static NTSTATUS pad_state( void *args )
++ {
++-    struct xinput_pad_state *state = args;
+++    struct xinput_pad_params *params = args;
++ 
++     if (!title_pad) return STATUS_NOT_SUPPORTED;
++-    if (!title_pad( state )) memset( state, 0, sizeof(*state) );
+++    if (!title_pad( params->index, &params->state )) memset( &params->state, 0, sizeof(params->state) );
++     return STATUS_SUCCESS;
++ }
++ 
++@@ -61,7 +62,7 @@ static NTSTATUS pad_rumble( void *args )
++     const struct xinput_rumble_params *params = args;
++ 
++     if (!title_rumble) return STATUS_NOT_SUPPORTED;
++-    title_rumble( params->left, params->right );
+++    title_rumble( params->index, params->left, params->right );
++     return STATUS_SUCCESS;
++ }
++ 
++diff --git a/dlls/xinput1_3/unixlib.h b/dlls/xinput1_3/unixlib.h
++index b47d9cb..c35b390 100644
++--- a/dlls/xinput1_3/unixlib.h
+++++ b/dlls/xinput1_3/unixlib.h
++@@ -38,8 +38,16 @@ struct xinput_pad_state
++     INT16 thumb_ry;
++ };
++ 
+++/* Controller index (0..3) and its state. */
+++struct xinput_pad_params
+++{
+++    UINT32 index;
+++    struct xinput_pad_state state;
+++};
+++
++ struct xinput_rumble_params
++ {
+++    UINT32 index;
++     UINT32 left;
++     UINT32 right;
++ };
++-- 
++2.56.0
++
+diff --git a/wine/ps5/pw_wine_sink.c b/wine/ps5/pw_wine_sink.c
+index a750320..8a599f4 100644
+--- a/wine/ps5/pw_wine_sink.c
++++ b/wine/ps5/pw_wine_sink.c
+@@ -17,8 +17,8 @@ static uint32_t head,count;
+ static PwWineSinkStats stats;
+ static pthread_once_t wake_once=PTHREAD_ONCE_INIT;
+ static int wake[2]={-1,-1};
+-static PwWinePad pad_state;
+-static uint32_t rumble_left,rumble_right,rumble_changed;
++static PwWinePad pad_state[PW_WINE_PADS];
++static uint32_t rumble_left[PW_WINE_PADS],rumble_right[PW_WINE_PADS],rumble_changed[PW_WINE_PADS];
+ /* Audio has its own lock: its sink blocks for a grain, which must not hold
+  * up frames or input. */
+ static pthread_mutex_t audio_lock=PTHREAD_MUTEX_INITIALIZER;
+@@ -173,45 +173,54 @@ static int same_pad(const PwWinePad *a,const PwWinePad *b)
+            a->right_trigger==b->right_trigger && a->thumb_lx==b->thumb_lx &&
+            a->thumb_ly==b->thumb_ly && a->thumb_rx==b->thumb_rx && a->thumb_ry==b->thumb_ry;
+ }
+-void pw_wine_set_pad(const PwWinePad *pad)
++void pw_wine_set_pad_at(uint32_t index,const PwWinePad *pad)
+ {
++    if(index>=PW_WINE_PADS)return;
++    PwWinePad *state=&pad_state[index];
+     pthread_mutex_lock(&lock);
+-    if(!pad)pad_state.connected=0;
+-    else if(!pad_state.connected || !same_pad(pad,&pad_state)) {
+-        uint32_t packet=pad_state.packet+1;
+-        pad_state=*pad;pad_state.connected=1;
+-        pad_state.packet=packet?packet:1;   /* 0 is never a packet */
++    if(!pad)state->connected=0;
++    else if(!state->connected || !same_pad(pad,state)) {
++        uint32_t packet=state->packet+1;
++        *state=*pad;state->connected=1;
++        state->packet=packet?packet:1;   /* 0 is never a packet */
+     }
+     pthread_mutex_unlock(&lock);
+ }
+-int pw_wine_pad(PwWinePad *pad)
++void pw_wine_set_pad(const PwWinePad *pad){pw_wine_set_pad_at(0,pad);}
++int pw_wine_pad_at(uint32_t index,PwWinePad *pad)
+ {
+     int connected;
+     if(!pad)return 0;
++    if(index>=PW_WINE_PADS){memset(pad,0,sizeof(*pad));return 0;}
+     pthread_mutex_lock(&lock);
+-    connected=pad_state.connected!=0;
+-    if(connected)*pad=pad_state;
++    connected=pad_state[index].connected!=0;
++    if(connected)*pad=pad_state[index];
+     else memset(pad,0,sizeof(*pad));
+     pthread_mutex_unlock(&lock);
+     return connected;
+ }
+-void pw_wine_set_rumble(uint32_t left,uint32_t right)
++int pw_wine_pad(PwWinePad *pad){return pw_wine_pad_at(0,pad);}
++void pw_wine_set_rumble_at(uint32_t index,uint32_t left,uint32_t right)
+ {
++    if(index>=PW_WINE_PADS)return;
+     if(left>0xffffu)left=0xffffu;
+     if(right>0xffffu)right=0xffffu;
+     pthread_mutex_lock(&lock);
+-    if(left!=rumble_left || right!=rumble_right) {
+-        rumble_left=left;rumble_right=right;rumble_changed=1;
++    if(left!=rumble_left[index] || right!=rumble_right[index]) {
++        rumble_left[index]=left;rumble_right[index]=right;rumble_changed[index]=1;
+     }
+     pthread_mutex_unlock(&lock);
+ }
+-int pw_wine_rumble(uint32_t *left,uint32_t *right)
++void pw_wine_set_rumble(uint32_t left,uint32_t right){pw_wine_set_rumble_at(0,left,right);}
++int pw_wine_rumble_at(uint32_t index,uint32_t *left,uint32_t *right)
+ {
+     int changed;
++    if(index>=PW_WINE_PADS)return 0;
+     pthread_mutex_lock(&lock);
+-    changed=(int)rumble_changed;rumble_changed=0;
+-    if(left)*left=rumble_left;
+-    if(right)*right=rumble_right;
++    changed=(int)rumble_changed[index];rumble_changed[index]=0;
++    if(left)*left=rumble_left[index];
++    if(right)*right=rumble_right[index];
+     pthread_mutex_unlock(&lock);
+     return changed;
+ }
++int pw_wine_rumble(uint32_t *left,uint32_t *right){return pw_wine_rumble_at(0,left,right);}
+diff --git a/wine/ps5/pw_wine_sink.h b/wine/ps5/pw_wine_sink.h
+index 6c09eb1..bc24463 100644
+--- a/wine/ps5/pw_wine_sink.h
++++ b/wine/ps5/pw_wine_sink.h
+@@ -50,6 +50,10 @@ typedef struct PwWineSinkStats {
+     uint32_t display_released;            /* 1 once Vulkan took the video output */
+ } PwWineSinkStats;
+ 
++/* XInput's controllers (XUSER_MAX_COUNT): 0 is the title's own user's
++ * DualSense, 1..3 the other signed-in users'. */
++enum { PW_WINE_PADS=4 };
++
+ /* An XInput gamepad (XINPUT_GAMEPAD with the connection and a packet
+  * number in front), laid out as xinput's Unix library reads it. */
+ typedef struct PwWinePad {
+@@ -73,6 +77,10 @@ void pw_wine_set_pad(const PwWinePad *pad);
+ /* 1 and the newest motor speeds (0..65535) when they changed since the
+  * last call, else 0. */
+ int pw_wine_rumble(uint32_t *left,uint32_t *right);
++/* The same for controller index (< PW_WINE_PADS; others are ignored and
++ * read as disconnected); the calls above are controller 0's. */
++void pw_wine_set_pad_at(uint32_t index,const PwWinePad *pad);
++int pw_wine_rumble_at(uint32_t index,uint32_t *left,uint32_t *right);
+ 
+ /* Driver side. -1 when no sink is set or the arguments are invalid. */
+ int pw_wine_present(const void *bgra,uint32_t width,uint32_t height,uint32_t stride);
+@@ -90,6 +98,8 @@ int pw_wine_input_fd(void);
+ int pw_wine_pad(PwWinePad *pad);
+ /* The rumble a game asked for (XInputSetState); speeds are clamped. */
+ void pw_wine_set_rumble(uint32_t left,uint32_t right);
++int pw_wine_pad_at(uint32_t index,PwWinePad *pad);
++void pw_wine_set_rumble_at(uint32_t index,uint32_t left,uint32_t right);
+ /* 1 when the title set an audio sink: the audio driver offers its device
+  * only then. */
+ int pw_wine_audio_available(void);
+-- 
+2.56.0
+
