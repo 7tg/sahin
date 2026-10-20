@@ -70,6 +70,9 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
 - **Dokunmatik yüzey** fare imlecini hareket ettirir, basınca tıklar.
 - **Çıkmak için** Options tuşunu ve dokunmatik yüzeyi birlikte yaklaşık bir saniye basılı
   tutun.
+- **Titreşim:** Blur istediğinde kumanda titrer; L2 ve R2 tetikleri de onunla birlikte
+  titrer. Tetiklerdeki etkiyi PS5 ayarlarındaki tetik efekti yoğunluğu ile azaltabilir ya
+  da kapatabilirsiniz.
 
 ## Bölünmüş ekran
 

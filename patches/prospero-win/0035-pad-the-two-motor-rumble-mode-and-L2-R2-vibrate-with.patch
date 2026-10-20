@@ -1,0 +1,277 @@
+From b501f2d43fac27105d8eefaba93a46ef6eebc281 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
+ <20913374+7tg@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 19:00:00 +0300
+Subject: [PATCH] pad: the two-motor rumble mode, and L2/R2 vibrate with the
+ rumble
+
+A DualSense starts in its haptics mode, where scePadSetVibration does
+nothing: a game's XInput rumble never reached the controller. Every pad
+opened (the title's and the other players') is now put in the two-motor
+mode (scePadSetVibrationMode 2), as the launcher's own pad is.
+
+pw_pad_ps5_vibrate also sets L2 and R2 vibrating with the motors
+(scePadSetTriggerEffect): amplitude 0..8 from the stronger motor, 30 Hz
+when the large one leads and 60 Hz when the small one does, set only when
+that changes. A failed effect leaves the rumble's result alone. The
+runner logs the mode's result when the pad opens, and both results with
+the first rumble.
+---
+ native/pw_pad_ps5.c     | 42 +++++++++++++++++++++++++++++++++++++---
+ native/pw_pad_ps5.h     | 26 +++++++++++++++++++++++--
+ native/wine64_main.c    |  7 +++++--
+ tests/test_pw_pad_ps5.c | 43 ++++++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 110 insertions(+), 8 deletions(-)
+
+diff --git a/native/pw_pad_ps5.c b/native/pw_pad_ps5.c
+index d8302ff..9abbc8b 100644
+--- a/native/pw_pad_ps5.c
++++ b/native/pw_pad_ps5.c
+@@ -9,6 +9,10 @@ _Static_assert(sizeof(PwPadPs5Data)==120,"ScePad data ABI");
+ _Static_assert(offsetof(PwPadPs5Data,connected)==76,"ScePad connected offset");
+ _Static_assert(offsetof(PwPadPs5Data,timestamp)==80,"ScePad timestamp offset");
+ _Static_assert(offsetof(PwPadPs5Data,connected_count)==104,"ScePad generation offset");
++_Static_assert(sizeof(PwPadPs5TriggerCommand)==56,"ScePad trigger command ABI");
++_Static_assert(sizeof(PwPadPs5TriggerEffect)==120,"ScePad trigger effect ABI");
++_Static_assert(offsetof(PwPadPs5TriggerEffect,command)==8,"ScePad trigger command offset");
++enum { PW_PAD_PS5_VIBRATION_COMPATIBLE=2 };   /* the two-motor rumble */
+ 
+ #ifndef PW_PAD_PS5_HOST_TEST
+ extern int sceUserServiceInitialize(const void *);
+@@ -20,6 +24,8 @@ extern int scePadRead(int32_t,PwPadPs5Data *,int32_t);
+ extern int scePadClose(int32_t);
+ extern int scePadSetVibration(int32_t,const uint8_t *);
+ extern int sceUserServiceGetLoginUserIdList(int32_t *);
++extern int scePadSetVibrationMode(int32_t,int32_t);
++extern int scePadSetTriggerEffect(int32_t,const PwPadPs5TriggerEffect *);
+ static int platform_user_initialize(const void *p){return sceUserServiceInitialize(p);}
+ static int platform_foreground_user(int32_t *u){return sceUserServiceGetForegroundUser(u);}
+ static int platform_user_terminate(void){return sceUserServiceTerminate();}
+@@ -30,6 +36,9 @@ static int platform_pad_read(int32_t h,PwPadPs5Data *s,int32_t n)
+ {return scePadRead(h,s,n);}
+ static int platform_pad_close(int32_t h){return scePadClose(h);}
+ static int platform_pad_set_vibration(int32_t h,const uint8_t m[2]){return scePadSetVibration(h,m);}
++static int platform_pad_set_vibration_mode(int32_t h,int32_t m){return scePadSetVibrationMode(h,m);}
++static int platform_pad_set_trigger_effect(int32_t h,const PwPadPs5TriggerEffect *e)
++{return scePadSetTriggerEffect(h,e);}
+ static int platform_login_users(int32_t users[PW_PAD_PS5_USERS])
+ {
+     /* SceUserServiceLoginUserIdList is PW_PAD_PS5_USERS ids; the room past
+@@ -50,7 +59,8 @@ int pw_pad_ps5_platform_ops(PwPadPs5Ops *ops)
+     *ops=(PwPadPs5Ops){platform_user_initialize,platform_foreground_user,
+         platform_user_terminate,platform_pad_init,platform_pad_open,
+         platform_pad_read,platform_pad_close,platform_pad_set_vibration,
+-        platform_login_users};return PW_OK;
++        platform_login_users,platform_pad_set_vibration_mode,
++        platform_pad_set_trigger_effect};return PW_OK;
+ #endif
+ }
+ 
+@@ -66,6 +76,15 @@ static void centre_analog(PwPadPs5 *pad)
+     pad->touching=0;
+ }
+ 
++/* A pad just opened: the two-motor rumble, as XInput's. */
++static void opened(PwPadPs5 *pad)
++{
++    pad->opened=1;centre_analog(pad);pad->vibration_mode_rc=INT_MIN;pad->trigger_rc=INT_MIN;
++    if(pad->ops.pad_set_vibration_mode)
++        pad->vibration_mode_rc=pad->ops.pad_set_vibration_mode(pad->pad_handle,
++                                                               PW_PAD_PS5_VIBRATION_COMPATIBLE);
++}
++
+ int pw_pad_ps5_open(PwPadPs5 *pad,const PwPadPs5Ops *ops,
+                     const PwPadKeyMap *map,size_t map_count)
+ {
+@@ -80,7 +99,7 @@ int pw_pad_ps5_open(PwPadPs5 *pad,const PwPadPs5Ops *ops,
+     pad->pad_init_rc=pad->ops.pad_init();if(pad->pad_init_rc<0)goto failed;
+     pad->pad_handle=pad->ops.pad_open(pad->user_id,0,0,NULL);
+     if(pad->pad_handle<0)goto failed;
+-    pad->opened=1;centre_analog(pad);return PW_OK;
++    opened(pad);return PW_OK;
+ failed:
+     if(pad->owns_user_service){pad->terminate_rc=pad->ops.user_terminate();pad->owns_user_service=0;}
+     return PW_ERR_STATE;
+@@ -156,6 +175,23 @@ int pw_pad_ps5_vibrate(PwPadPs5 *pad,uint8_t large,uint8_t small)
+     if(!pad->ops.pad_set_vibration)return PW_ERR_UNSUPPORTED;
+     const uint8_t motors[2]={large,small};
+     pad->vibration_rc=pad->ops.pad_set_vibration(pad->pad_handle,motors);
++    /* The triggers: amplitude 0..8 from the stronger motor, 30 Hz when the
++     * large one leads, 60 Hz when the small one does. */
++    uint8_t strong=large>small?large:small;
++    uint8_t amplitude=(uint8_t)((strong*8+254)/255),frequency=amplitude?(large>=small?30:60):0;
++    if(pad->ops.pad_set_trigger_effect &&
++       (amplitude!=pad->trigger_amplitude || frequency!=pad->trigger_frequency)) {
++        PwPadPs5TriggerEffect effect;memset(&effect,0,sizeof(effect));
++        effect.mask=PW_PAD_PS5_TRIGGER_L2|PW_PAD_PS5_TRIGGER_R2;
++        for(int i=0;i<2;i++) {
++            PwPadPs5TriggerCommand *command=&effect.command[i];
++            command->mode=amplitude?PW_PAD_PS5_TRIGGER_VIBRATION:PW_PAD_PS5_TRIGGER_OFF;
++            command->data[0]=1;command->data[1]=amplitude;command->data[2]=frequency;
++            if(!amplitude)command->data[0]=command->data[1]=command->data[2]=0;
++        }
++        pad->trigger_rc=pad->ops.pad_set_trigger_effect(pad->pad_handle,&effect);
++        if(pad->trigger_rc>=0){pad->trigger_amplitude=amplitude;pad->trigger_frequency=frequency;}
++    }
+     return pad->vibration_rc<0?PW_ERR_STATE:PW_OK;
+ }
+ 
+@@ -180,7 +216,7 @@ static int open_player(PwPadPs5 *pad,const PwPadPs5 *title_pad,int32_t user)
+     if(pw_pad_init(&pad->core,title_pad->core.map,title_pad->core.map_count)!=PW_OK)goto failed;
+     pad->pad_handle=pad->ops.pad_open(user,0,0,NULL);
+     if(pad->pad_handle<0)goto failed;
+-    pad->opened=1;centre_analog(pad);return 1;
++    opened(pad);return 1;
+ failed:
+     pad->user_id=-1;pad->pad_handle=-1;return 0;
+ }
+diff --git a/native/pw_pad_ps5.h b/native/pw_pad_ps5.h
+index e7f4dd7..dc58bfc 100644
+--- a/native/pw_pad_ps5.h
++++ b/native/pw_pad_ps5.h
+@@ -17,6 +17,17 @@ typedef struct PwPadPs5Data {
+     uint8_t device_unique_data_length,device_unique_data[12];
+ } PwPadPs5Data;
+ 
++/* scePadSetTriggerEffect's parameter: the triggers it sets (mask) and one
++ * command each, [0] L2 and [1] R2. A command is its mode and that mode's
++ * bytes; PW_PAD_PS5_TRIGGER_VIBRATION's are where the vibration starts
++ * (0..9 along the pull), its amplitude (0..8) and frequency (Hz). */
++enum { PW_PAD_PS5_TRIGGER_L2=0x01,PW_PAD_PS5_TRIGGER_R2=0x02,
++       PW_PAD_PS5_TRIGGER_OFF=0,PW_PAD_PS5_TRIGGER_VIBRATION=3 };
++typedef struct PwPadPs5TriggerCommand { uint32_t mode;uint8_t reserved[4],data[48]; } PwPadPs5TriggerCommand;
++typedef struct PwPadPs5TriggerEffect {
++    uint8_t mask,reserved[7];PwPadPs5TriggerCommand command[2];
++} PwPadPs5TriggerEffect;
++
+ typedef struct PwPadPs5Ops {
+     int (*user_initialize)(const void *);
+     int (*foreground_user)(int32_t *);
+@@ -30,12 +41,20 @@ typedef struct PwPadPs5Ops {
+     /* Optional: the signed-in users (sceUserServiceGetLoginUserIdList), -1
+      * for an empty place; NULL if none. */
+     int (*login_users)(int32_t users[PW_PAD_PS5_USERS]);
++    /* Optional: scePadSetVibrationMode(handle, mode), set to the two-motor
++     * rumble when a pad opens (a DualSense starts in its haptics mode, where
++     * scePadSetVibration does nothing); NULL if none. */
++    int (*pad_set_vibration_mode)(int32_t,int32_t);
++    /* Optional: scePadSetTriggerEffect, NULL if none. */
++    int (*pad_set_trigger_effect)(int32_t,const PwPadPs5TriggerEffect *);
+ } PwPadPs5Ops;
+ 
+ typedef struct PwPadPs5 {
+     PwPad core;PwPadPs5Ops ops;int32_t user_id,pad_handle;
+     int user_initialize_rc,pad_init_rc,close_rc,terminate_rc,last_read_rc;
+-    int vibration_rc;
++    int vibration_rc,vibration_mode_rc,trigger_rc;
++    /* The triggers' vibration last set, 0 off (pw_pad_ps5_vibrate). */
++    uint8_t trigger_amplitude,trigger_frequency;
+     uint64_t polls,empty_reads,read_errors,connected_samples,disconnected_samples,
+              intercepted_samples,generation_changes;
+     uint8_t last_generation;
+@@ -56,7 +75,10 @@ int pw_pad_ps5_close(PwPadPs5 *);
+ /* Run the motors: large is the low-frequency one (XInput's left), small
+  * the high-frequency one, 0 stops. PW_OK, PW_ERR_UNSUPPORTED with no
+  * vibration op, PW_ERR_PRECONDITION when the pad is not open, PW_ERR_STATE
+- * when the call fails (its result is kept in vibration_rc). */
++ * when the call fails (its result is kept in vibration_rc). L2 and R2
++ * vibrate with it, from early in their pull: amplitude from the stronger
++ * motor, a lower frequency when the large one leads; the effect is set only
++ * when that changes, and its failure (trigger_rc) leaves the result alone. */
+ int pw_pad_ps5_vibrate(PwPadPs5 *,uint8_t large,uint8_t small);
+ 
+ /* The other signed-in users' DualSenses, for local multiplayer: slot i is
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 354eb6d..7f0624c 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -1270,6 +1270,8 @@ int main(int argc, char **argv)
+         if (pad_status == PW_OK)
+             pad_status = pw_pad_ps5_open(&pad, &pad_ops, pad_open_map,
+                                          sizeof(pad_open_map) / sizeof(pad_open_map[0]));
++        if (pad_status == PW_OK)
++            PS5LOG_LOG("PW_WINE64 pad vibration_mode rc=%d", pad.vibration_mode_rc);
+         pw_pad_players_init(&players);
+         if (pad_status == PW_OK && set_pad_at) {
+             players_open = pw_pad_players_scan(&players, &pad);
+@@ -1479,8 +1481,9 @@ int main(int argc, char **argv)
+             if (rumble && rumble(&left, &right) == 1) {
+                 int vibrate = pw_pad_ps5_vibrate(&pad, (uint8_t)(left >> 8), (uint8_t)(right >> 8));
+                 if (!vibrations++ || vibrate != PW_OK)
+-                    PS5LOG_LOG("PW_WINE64 rumble left=%u right=%u status=%s rc=%d", (unsigned)left,
+-                               (unsigned)right, pw_result_name(vibrate), pad.vibration_rc);
++                    PS5LOG_LOG("PW_WINE64 rumble left=%u right=%u status=%s rc=%d mode_rc=%d trigger_rc=%d",
++                               (unsigned)left, (unsigned)right, pw_result_name(vibrate),
++                               pad.vibration_rc, pad.vibration_mode_rc, pad.trigger_rc);
+             }
+         }
+         if (__atomic_load_n(&display_request, __ATOMIC_ACQUIRE) &&
+diff --git a/tests/test_pw_pad_ps5.c b/tests/test_pw_pad_ps5.c
+index 8feef43..07ae213 100644
+--- a/tests/test_pw_pad_ps5.c
++++ b/tests/test_pw_pad_ps5.c
+@@ -24,12 +24,52 @@ static int login_users(int32_t users[4]){login_calls++;memcpy(users,logged_in,si
+ static int vibration_calls,vibration_rc;static uint8_t motors_seen[2];
+ static int pad_set_vibration(int32_t h,const uint8_t m[2])
+ {assert(h==7);vibration_calls++;memcpy(motors_seen,m,2);return vibration_rc;}
++static int mode_calls;static int32_t mode_handles[8],mode_seen;
++static int pad_set_vibration_mode(int32_t h,int32_t m){mode_handles[mode_calls++&7]=h;mode_seen=m;return 0;}
++static int trigger_calls,trigger_rc;static PwPadPs5TriggerEffect trigger_seen;
++static int pad_set_trigger_effect(int32_t h,const PwPadPs5TriggerEffect *e)
++{assert(h==7);trigger_calls++;trigger_seen=*e;return trigger_rc;}
+ static const PwPadPs5Ops ops={user_initialize,foreground,terminate,pad_init,pad_open,pad_read,pad_close,
+-                              pad_set_vibration,login_users};
++                              pad_set_vibration,login_users,pad_set_vibration_mode,
++                              pad_set_trigger_effect};
+ 
+ enum { CREATE=0x1,L1=0x400 };
+ static const PwPadKeyMap map[]={{L1,'Z',0,0,"left-flipper"}};
+ 
++/* Each pad opened is put in the two-motor rumble mode (2), and the
++ * triggers vibrate with the motors, set only when their vibration changes. */
++static void test_rumble_mode_and_triggers(void)
++{
++    PwPadPs5 pad;PwPadPlayers players;int modes=mode_calls;
++    assert(pw_pad_ps5_open(&pad,&ops,map,1)==PW_OK);
++    assert(mode_calls==modes+1 && mode_handles[modes&7]==7 && mode_seen==2 && !pad.vibration_mode_rc);
++    memcpy(logged_in,(int32_t[4]){42,5,-1,-1},sizeof(logged_in));
++    pw_pad_players_init(&players);
++    assert(pw_pad_players_scan(&players,&pad)==1 && mode_calls==modes+2 && mode_handles[(modes+1)&7]==105);
++    pw_pad_players_close(&players);memcpy(logged_in,(int32_t[4]){42,-1,-1,-1},sizeof(logged_in));
++    closed_count=0;
++    int triggers=trigger_calls;
++    assert(pw_pad_ps5_vibrate(&pad,255,10)==PW_OK && trigger_calls==triggers+1);
++    assert(trigger_seen.mask==3);
++    for(int i=0;i<2;i++)
++        assert(trigger_seen.command[i].mode==3 && trigger_seen.command[i].data[0]==1 &&
++               trigger_seen.command[i].data[1]==8 && trigger_seen.command[i].data[2]==30);
++    assert(pw_pad_ps5_vibrate(&pad,254,0)==PW_OK && trigger_calls==triggers+1);   /* unchanged */
++    assert(pw_pad_ps5_vibrate(&pad,0,40)==PW_OK && trigger_calls==triggers+2 &&
++           trigger_seen.command[1].data[1]==2 && trigger_seen.command[1].data[2]==60);
++    /* A failed effect leaves the rumble's result alone and is tried again. */
++    trigger_rc=-1;
++    assert(pw_pad_ps5_vibrate(&pad,0,0)==PW_OK && pad.trigger_rc==-1 && trigger_calls==triggers+3);
++    trigger_rc=0;
++    assert(pw_pad_ps5_vibrate(&pad,0,0)==PW_OK && trigger_calls==triggers+4 &&
++           trigger_seen.command[0].mode==0 && !trigger_seen.command[0].data[1]);
++    assert(pw_pad_ps5_vibrate(&pad,0,0)==PW_OK && trigger_calls==triggers+4);
++    assert(pw_pad_ps5_close(&pad)==PW_OK);
++    open_calls=close_calls=terminate_calls=init_calls=foreground_calls=pad_init_calls=0;
++    vibration_calls=0;closed_count=0;
++}
++
++
+ /* The other signed-in users' pads: opened in sign-in order, kept in their
+  * slot, closed when the user signs out; the title's own user is never one. */
+ static void test_players(void)
+@@ -71,6 +111,7 @@ static void test_players(void)
+ int main(void)
+ {
+     test_players();
++    test_rumble_mode_and_triggers();
+     PwPadPs5 pad;
+     assert(pw_pad_ps5_open(&pad,&ops,map,1)==PW_OK && pad.opened && pad.pad_handle==7);
+     assert(pad.left_stick.x==0x80 && pad.right_stick.y==0x80 && !pad.l2 && !pad.r2);
+-- 
+2.56.0
+
