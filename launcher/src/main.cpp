@@ -170,8 +170,11 @@ std::optional<store::InGame> take_ingame_choices(const std::string &storage_root
     return choices;
 }
 
-// Square held as the app starts: its page instead of the game (settings, repair). A pad that
-// can't be read, or reads nothing within a moment, starts the game: nothing waits on it.
+// Square held as the app starts: its page instead of the game (settings, repair). The pad is
+// read for a moment (kSquareWindowUs): its first samples after the open can be connected but
+// empty, so a press is looked for until the window ends, not only in the first batch. A pad
+// that can't be read, or reads nothing, starts the game.
+constexpr std::int64_t kSquareWindowUs = 600000;
 bool square_held()
 {
     hui::ps5::Pad pad;
@@ -181,10 +184,13 @@ bool square_held()
         return false;
     }
     std::array<hui::PadSample, 64> samples{};
-    for (int attempt = 0; attempt < 10; ++attempt) // the first samples can lag the open
+    const std::int64_t until = hui::sys::monotonic_us() + kSquareWindowUs;
+    bool connected = false;
+    int batches = 0;
+    while (hui::sys::monotonic_us() < until)
     {
         const auto count = pad.read(samples);
-        bool connected = false;
+        batches += count > 0;
         for (std::size_t i = 0; i < count; ++i)
         {
             if (!samples[i].connected)
@@ -196,11 +202,10 @@ bool square_held()
                 return true;
             }
         }
-        if (connected)
-            return false;
         hui::sys::sleep_us(20000);
     }
-    hui::sys::log("[STORE] start: the controller said nothing, starting the game");
+    hui::sys::log("[STORE] start: no Square in %d batches (%s), starting the game", batches,
+                  connected ? "connected" : "nothing connected");
     return false;
 }
 
