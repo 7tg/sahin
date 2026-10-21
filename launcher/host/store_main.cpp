@@ -8,6 +8,7 @@
 #include "app/early_exit.hpp"
 #include "catalog/blackbox.hpp"
 #include "catalog/icons.hpp"
+#include "core/i18n.hpp"
 #include "core/image.hpp"
 #include "core/qr.hpp"
 #include "core/save_file.hpp"
@@ -17,6 +18,7 @@
 #include <EGL/eglext.h>
 #include <cstdio>
 #include <cstdlib>
+#include <string_view>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -351,6 +353,9 @@ static void check_hold_to_uninstall()
 
 int main(int argc, char **argv)
 {
+    // STORE_LANGUAGE=tr: the snapshots in Turkish, as a Turkish console shows the page.
+    if (const char *language = std::getenv("STORE_LANGUAGE"); language && std::string_view(language) == "tr")
+        store::i18n::set_language(store::i18n::Language::turkish);
     check_artwork_requests();
     check_search_and_sort();
     check_wrapping_and_closing();
@@ -521,7 +526,7 @@ int main(int argc, char **argv)
                     // The game's own app: its page only (installed, the player quit to it).
                     screen.set_single_game("PPSA99404");
                     if (mode == "mw-solo-installed-closed") // Blur closed at once last time
-                        screen.set_single_notice(store::kEarlyExitHint);
+                        screen.set_single_notice(store::i18n::trs(store::kEarlyExitHint));
                 }
                 assert(screen.open_app("PPSA99404"));
                 settle(90);
@@ -771,9 +776,9 @@ int main(int argc, char **argv)
                     screen.set_activity(
                         {"PPSA99007", 3, 61u << 20, 94u << 20, {"PPSA99420", "PPSA99169"}, -1, {}});
                     screen.finish_job(
-                        true, false, "ProsperoRadio installed",
+                        true, false, false, "ProsperoRadio installed",
                         "ShadowMountPlus will add it to your home screen in a moment.");
-                    screen.finish_job(false, false, "PS5SX2: not changed", "Close the app first");
+                    screen.finish_job(false, false, false, "PS5SX2: not changed", "Close the app first");
                 }
                 screen.open_panel(mode == "queue" || mode == "downloads" ? 0
                                   : mode == "settings"                   ? 1
@@ -1014,7 +1019,7 @@ int main(int argc, char **argv)
                                            "", false, true, false}};
                         screen.set_inventory(std::move(inventory));
                         screen.finish_job(
-                            true, false, "RetroArch installed",
+                            true, false, false, "RetroArch installed",
                             "ShadowMountPlus adds it to your home screen in a moment.");
                     }
                 }

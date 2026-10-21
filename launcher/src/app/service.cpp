@@ -9,6 +9,7 @@
 #include "system/title_registry.hpp"
 #include "system/self_update_store.hpp"
 #include "app/service.hpp"
+#include "core/i18n.hpp"
 #include "library/game_sources.hpp"
 #include "library/prefix.hpp"
 #include "library/tree.hpp"
@@ -399,7 +400,7 @@ bool Service::game_plan(const catalog::Entry &entry, library::InstallPlan &plan,
             manifest = library::manifest_for(game.folder);
     if (!manifest || root_.empty() || plans.empty())
     {
-        error = "This game can't be installed yet";
+        error = i18n::trs("This game can't be installed yet");
         return false;
     }
     if (!library::load_plan(plans + "/" + manifest->folder + ".json", plan, error))
@@ -454,7 +455,7 @@ bool Service::home_app(const catalog::Entry &game, const std::string &location,
                   game.id.c_str(), result.operation.c_str(), result.ok, result.version.c_str(),
                   result.error.c_str(), result.note.c_str());
     if (!result.ok)
-        error = "The game is installed, but its Home app isn't: " + result.error;
+        error = i18n::trf("The game is installed, but its Home app isn't: {0}", {result.error});
     return result.ok;
 }
 
@@ -469,7 +470,7 @@ bool Service::remove_home_app(const std::string &id, const std::string &location
     const auto result = install::uninstall(environment, id, location, progress_);
     if (!result.ok)
     {
-        error = "Its Home app can't be removed: " + result.error;
+        error = i18n::trf("Its Home app can't be removed: {0}", {result.error});
         return false;
     }
     const int unregistered = system::unregister_title(id);
@@ -530,8 +531,9 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
         base = library::locate(root_, library::usb_roots(), *manifest);
         if (!base.on_usb || !usable(base))
         {
-            error = base.state == library::State::absent ? "There's no copy of the game to install from"
-                                                         : "Your copy can't be used: " + base.detail;
+            error = base.state == library::State::absent
+                        ? i18n::trs("There's no copy of the game to install from")
+                        : i18n::trf("Your copy can't be used: {0}", {base.detail});
             return false;
         }
     }
@@ -565,7 +567,7 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
     Timer whole, part_time;
     if (from_usb)
     {
-        stage(0, "Copying it from the USB drive to the console");
+        stage(0, i18n::trs("Copying it from the USB drive to the console"));
         progress_.phase = static_cast<int>(install::Phase::copying);
         const bool imported = library::import_base(
             base.path, root_, *manifest,
@@ -583,14 +585,14 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
                       progress_.total.load());
         if (!imported)
             return false;
-        stage(0, "Copied to the console; the USB drive can go");
+        stage(0, i18n::trs("Copied to the console; the USB drive can go"));
     }
     else
-        stage(0, "On the console");
+        stage(0, i18n::trs("On the console"));
     overall(downloads, 0.0);
     progress_.done = 0;
     progress_.total = 0;
-    stage(1, "Looking for the " + std::to_string(needed) + " files it needs");
+    stage(1, i18n::trf("Looking for the {0} files it needs", {std::to_string(needed)}));
     progress_.phase = static_cast<int>(install::Phase::downloading);
     // fetch_sources runs downloads on threads of its own: each worker keeps its connection
     // for its pieces here, released when this job is done. The job's cancel reaches them
@@ -646,12 +648,12 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
                     std::string what = shown.front();
                     if (shown.size() > 1)
                     {
-                        what = std::to_string(shown.size()) + " files at once: ";
+                        what = i18n::trf("{0} files at once: ", {std::to_string(shown.size())});
                         for (std::size_t i = 0; i < shown.size(); ++i)
                             what += (i ? ", " : "") + shown[i];
                     }
-                    stage(1, "Getting " + what + " (" + std::to_string(status.index) + " of " +
-                                 std::to_string(status.count) + ")");
+                    stage(1, i18n::trf("Getting {0} ({1} of {2})",
+                                       {what, std::to_string(status.index), std::to_string(status.count)}));
                 }
             },
             job_control_.cancelled, error))
@@ -663,7 +665,7 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
     // arrived): install_game needn't again.
     for (const auto *source : sources)
         options.verified.insert(source->sha256);
-    stage(1, "All " + std::to_string(needed) + " files ready");
+    stage(1, i18n::trf("All {0} files ready", {std::to_string(needed)}));
     // The prefix, made from the bare prefix the manager carries when it isn't there yet.
     const auto prefix = chosen_plan.prefix;
     struct stat bare{};
@@ -672,10 +674,10 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
         weight[prefix_part] = static_cast<double>(bare.st_size);
     overall(prefix_part, 0.0);
     if (library::prefix_ready(win_root, prefix))
-        stage(2, "Using the prefix " + prefix);
+        stage(2, i18n::trf("Using the prefix {0}", {prefix}));
     else
     {
-        stage(2, "Making the prefix " + prefix);
+        stage(2, i18n::trf("Making the prefix {0}", {prefix}));
         progress_.phase = static_cast<int>(install::Phase::unpacking);
         if (!library::ensure_prefix(
                 win_root, prefix, bundle + "/bare-prefix-sahin.zip",
@@ -690,7 +692,7 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
             return false;
         part_time.lap("making the prefix " + prefix,
                       static_cast<std::uint64_t>(weight[prefix_part]));
-        stage(2, "Made the prefix " + prefix);
+        stage(2, i18n::trf("Made the prefix {0}", {prefix}));
     }
     std::string timed_step;
     std::uint64_t timed_bytes = 0;
@@ -743,17 +745,17 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
                 const int at = step.starts_with("Checking the") && step != "Checking the result" ? 3
                                : step == "Setting up Wine" || step == "Installed"              ? 5
                                                                                                : 4;
-                const char *done[] = {"", "", "", "Your copy and the mod files check out",
-                                      "The game's files are in place"};
+                const char *done[] = {"", "", "", i18n::trc("Your copy and the mod files check out"),
+                                      i18n::trc("The game's files are in place")};
                 for (int before = 3; before < at; ++before)
                     stage(before, done[before]);
-                stage(at, step == "Checking the base copy"   ? "Checking your copy of the game"
-                          : step == "Copying the base copy"  ? "Copying your game into the prefix"
-                          : step == "Settings"               ? "Writing the mods' settings"
-                          : step == "Checking the result"    ? "Checking every file it changed"
-                          : step == "Setting up Wine"        ? "Wine's DLLs, registry and profile"
-                          : step == "Installed"              ? "Registry and profile set"
-                                                             : step);
+                stage(at, step == "Checking the base copy"   ? i18n::trc("Checking your copy of the game")
+                          : step == "Copying the base copy"  ? i18n::trc("Copying your game into the prefix")
+                          : step == "Settings"               ? i18n::trc("Writing the mods' settings")
+                          : step == "Checking the result"    ? i18n::trc("Checking every file it changed")
+                          : step == "Setting up Wine"        ? i18n::trc("Wine's DLLs, registry and profile")
+                          : step == "Installed"              ? i18n::trc("Registry and profile set")
+                                                             : step.c_str());
             },
             job_control_.cancelled, error);
     step_done();
@@ -763,16 +765,16 @@ bool Service::game_job(const catalog::Entry &entry, bool remove, const std::stri
     {
         whole.lap("the whole install");
         overall_ = 1.0f;
-        stage(6, "Ready to play"); // a game's own app: it is the Home app
+        stage(6, i18n::trs("Ready to play")); // a game's own app: it is the Home app
         return true;
     }
-    stage(6, "Putting its app on the Home screen");
+    stage(6, i18n::trs("Putting its app on the Home screen"));
     if (!home_app(entry, location, environment, error))
         return false;
     part_time.lap("its Home app");
     whole.lap("the whole install");
     overall_ = 1.0f;
-    stage(6, "On the Home screen");
+    stage(6, i18n::trs("On the Home screen"));
     return true;
 }
 
@@ -845,14 +847,14 @@ bool Service::import_job(const catalog::Entry &entry, std::string &error)
             manifest = library::manifest_for(game.folder);
     if (!manifest || root_.empty())
     {
-        error = "This game has no base copy to import";
+        error = i18n::trs("This game has no base copy to import");
         return false;
     }
     const auto found = library::locate(root_, library::usb_roots(), *manifest);
     if (!found.on_usb ||
         (found.state != library::State::ready && found.state != library::State::needs_patch))
     {
-        error = found.on_usb ? found.detail : "No copy on a USB drive to import";
+        error = found.on_usb ? found.detail : i18n::trs("No copy on a USB drive to import");
         return false;
     }
     progress_.phase = static_cast<int>(install::Phase::copying);
@@ -1068,8 +1070,8 @@ void Service::run_installer()
     std::string broken;
     if (environment.root.empty() || !hui::save::ensure_directory(environment.root) ||
         (!installer_environment && !load_policy(environment.policy)))
-        broken = "Installing is unavailable: ShadowMountPlus's settings couldn't be read. "
-                 "About says what to check.";
+        broken = i18n::trs("Installing is unavailable: ShadowMountPlus's settings couldn't be read. "
+                           "About says what to check.");
     const auto rescan = [&]
     {
         Update installed;
@@ -1104,7 +1106,7 @@ void Service::run_installer()
         else if (recovered.restart)
         {
             // The console started the old store once more after its update.
-            broken = "Sahin is finishing its own update. Close it and open it again.";
+            broken = i18n::trs("Sahin is finishing its own update. Close it and open it again.");
             Update notice;
             notice.kind = Update::Kind::job;
             notice.entry.id = environment.self;
@@ -1119,8 +1121,8 @@ void Service::run_installer()
         {
             Update notice;
             notice.kind = Update::Kind::notice;
-            notice.message = kOwnGame ? "Recovered" : "Sahin recovered";
-            notice.detail = "An interrupted " + recovered.operation + " was cleaned up.";
+            notice.message = i18n::trs(kOwnGame ? "Recovered" : "Sahin recovered");
+            notice.detail = i18n::trf("An interrupted {0} was cleaned up.", {recovered.operation});
             publish(std::move(notice));
             rescan();
         }
@@ -1249,14 +1251,15 @@ void Service::run_installer()
         else if (result.ok)
         {
             done.restart = result.restart;
-            done.message = name + (result.operation == "uninstall" ? " uninstalled"
-                                   : result.operation == "import"  ? " copied to the console"
-                                   : result.operation == "game-uninstall" ? " uninstalled"
-                                   : result.operation == "game-settings" ? ": settings saved"
-                                   : result.operation == "adopt"   ? " is now managed"
-                                   : result.operation == "update"  ? " updated"
-                                                                   : " installed");
-            done.detail =
+            done.message = i18n::trf(result.operation == "uninstall"      ? "{0} uninstalled"
+                                     : result.operation == "import"         ? "{0} copied to the console"
+                                     : result.operation == "game-uninstall" ? "{0} uninstalled"
+                                     : result.operation == "game-settings"  ? "{0}: settings saved"
+                                     : result.operation == "adopt"          ? "{0} is now managed"
+                                     : result.operation == "update"         ? "{0} updated"
+                                                                            : "{0} installed",
+                                     {name});
+            done.detail = i18n::trs(
                 result.restart ? "Close Sahin and open it again to finish. If the "
                                  "old version opens, restart the console first."
                 : result.operation == "uninstall"
@@ -1276,14 +1279,15 @@ void Service::run_installer()
                 : result.operation == "update"
                     ? "The new version is in place. Give the console a few minutes "
                       "before starting it."
-                    : "ShadowMountPlus will add it to your home screen in a moment.";
+                    : "ShadowMountPlus will add it to your home screen in a moment.");
             if (result.operation == "update" && !result.kept_at.empty())
-                done.detail = "Previous folder kept in " + result.kept_at + ".";
+                done.detail = i18n::trf("Previous folder kept in {0}.", {result.kept_at});
         }
         else
         {
-            done.message = name + (result.error == "Cancelled" ? ": cancelled" : ": not changed");
-            done.detail = result.error == "Cancelled" ? "Nothing was installed." : result.error;
+            done.cancelled = result.error == "Cancelled";
+            done.message = i18n::trf(done.cancelled ? "{0}: cancelled" : "{0}: not changed", {name});
+            done.detail = done.cancelled ? i18n::trs("Nothing was installed.") : result.error;
         }
         if (broken.empty())
             rescan();

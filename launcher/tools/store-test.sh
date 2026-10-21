@@ -7,6 +7,7 @@ root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 build="$root/build/store-tests"
 mkdir -p "$build"
 python3 "$root/tools/store-smoke.py" --self-test
+python3 "$root/tools/check-i18n.py"
 flags=(-g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
 # On macOS, Apple's ASan has no leak checker and Apple's clang no libFuzzer; Homebrew's
 # LLVM (brew install llvm) has libFuzzer, so the fuzzing uses it when it's there.
@@ -21,6 +22,10 @@ if [[ $(uname -s) == Darwin ]]; then
         fuzz_cxx=$llvm/bin/clang++
     fi
 fi
+clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
+    "$root/tests/store_i18n_test.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" \
+    -o "$build/i18n-test"
+ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/i18n-test"
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
     "$root/tests/store_locations_test.cpp" "$root/src/system/locations.cpp" -o "$build/locations-test"
 ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/locations-test"
@@ -122,7 +127,7 @@ PY
     printf 'Fuzzing passed: %s\n' "$(grep -c '' "$build/fuzz.log") log lines, ${fuzz_seconds}s"
 fi
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
-    "$root/tests/store_base_game_test.cpp" "$root/src/library/base_game.cpp" "$root/src/library/tree.cpp" "${miniz[@]}" \
+    "$root/tests/store_base_game_test.cpp" "$root/src/library/base_game.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" "$root/src/library/tree.cpp" "${miniz[@]}" \
     -o "$build/base-game-test"
 ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/base-game-test"
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
@@ -140,11 +145,11 @@ clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" 
     -DSTORE_ASSETS="\"$root/assets\"" "$root/tests/store_game_install_test.cpp" \
     "$root/src/library/game_install.cpp" "$root/src/library/upgrade.cpp" "$root/src/library/rtpatch.cpp" "$root/src/library/install_plan.cpp" \
     "$root/src/library/game_profile.cpp" "$root/src/library/wine_registry.cpp" \
-    "$root/src/library/base_game.cpp" "$root/src/library/tree.cpp" "$root/src/core/save_file.cpp" \
+    "$root/src/library/base_game.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" "$root/src/library/tree.cpp" "$root/src/core/save_file.cpp" \
     "${objects[@]}" "${miniz[@]}" -o "$build/game-install-test"
 ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/game-install-test"
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
-    "$root/tests/store_rtpatch_test.cpp" "$root/src/library/rtpatch.cpp" "$root/src/library/base_game.cpp" \
+    "$root/tests/store_rtpatch_test.cpp" "$root/src/library/rtpatch.cpp" "$root/src/library/base_game.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" \
     "$root/src/library/install_plan.cpp" "$root/src/library/game_profile.cpp" "$root/src/library/tree.cpp" \
     "$root/src/core/save_file.cpp" "${objects[@]}" "${miniz[@]}" -o "$build/rtpatch-test"
 ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/rtpatch-test" "$build/rtpatch-synthetic"
@@ -152,7 +157,7 @@ clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" 
     "$root/tests/store_game_sources_test.cpp" "$root/src/library/game_sources.cpp" \
     "$root/src/library/game_install.cpp" "$root/src/library/upgrade.cpp" "$root/src/library/rtpatch.cpp" \
     "$root/src/library/install_plan.cpp" "$root/src/library/game_profile.cpp" "$root/src/library/wine_registry.cpp" \
-    "$root/src/library/base_game.cpp" "$root/src/library/tree.cpp" "$root/src/core/save_file.cpp" \
+    "$root/src/library/base_game.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" "$root/src/library/tree.cpp" "$root/src/core/save_file.cpp" \
     "${objects[@]}" "${miniz[@]}" -o "$build/game-sources-test"
 ASAN_OPTIONS=detect_leaks=$leaks UBSAN_OPTIONS=halt_on_error=1 "$build/game-sources-test"
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
@@ -180,7 +185,7 @@ clang -std=c11 "${flags[@]}" -Wall -Wextra -Werror -c "$root/src/system/update_c
 clang++ -std=c++20 "${flags[@]}" -Wall -Wextra -Wpedantic -Werror -I"$root/src" \
     "$root/tests/store_service_test.cpp" "$root/src/app/service.cpp" \
     "$root/src/system/inventory.cpp" "$root/src/system/locations.cpp" \
-    "$root/src/core/qr.cpp" "$root/src/catalog/blackbox.cpp" "$root/src/library/base_game.cpp" "$root/src/library/tree.cpp" "$root/src/library/upgrade.cpp" "$root/src/library/rtpatch.cpp" "$root/src/library/game_sources.cpp" "$root/src/library/prefix.cpp" "$root/src/library/game_install.cpp" "$root/src/library/install_plan.cpp" "$root/src/library/game_profile.cpp" "$root/src/library/wine_registry.cpp" "$root/src/system/app_folder.cpp" \
+    "$root/src/core/qr.cpp" "$root/src/catalog/blackbox.cpp" "$root/src/library/base_game.cpp" "$root/src/core/i18n.cpp" "$root/src/core/i18n_strings.cpp" "$root/src/library/tree.cpp" "$root/src/library/upgrade.cpp" "$root/src/library/rtpatch.cpp" "$root/src/library/game_sources.cpp" "$root/src/library/prefix.cpp" "$root/src/library/game_install.cpp" "$root/src/library/install_plan.cpp" "$root/src/library/game_profile.cpp" "$root/src/library/wine_registry.cpp" "$root/src/system/app_folder.cpp" \
     "$root/src/catalog/icons.cpp" "$root/src/catalog/catalog.cpp" \
     "$root/src/core/image.cpp" "$root/src/core/save_file.cpp" "$root/host/platform_host.cpp" \
     "$root/src/install/archive.cpp" "$root/src/install/files.cpp" \

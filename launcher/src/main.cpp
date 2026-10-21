@@ -8,6 +8,7 @@
 #include "audio/cues.hpp"
 #include "audio/music.hpp"
 #include "core/frame_stats.hpp"
+#include "core/i18n.hpp"
 #include "core/image.hpp"
 #include "core/qr.hpp"
 #include "core/version.hpp"
@@ -99,16 +100,27 @@ bool single_game_installed(const std::string &app_root, const std::string &stora
                 &info) == 0;
 }
 
-// The game in the PS5's language, when the copy has it (store::library::apply_system_language),
-// at every start: the system setting may have changed since the last.
-void apply_system_language(const std::string &app_root, const std::string &storage_root)
+// The PS5's language setting (SCE_SYSTEM_SERVICE_PARAM_ID_LANG), read at every start: it may
+// have changed since the last. -1 when it can't be read.
+int system_language()
 {
-    constexpr int kParamLanguage = 1; // SCE_SYSTEM_SERVICE_PARAM_ID_LANG
+    constexpr int kParamLanguage = 1;
     int language = -1;
+    if (const int rc = sceSystemServiceParamGetInt(kParamLanguage, &language); rc != 0)
+    {
+        hui::sys::log("[STORE] language: system language unread rc=0x%08x", static_cast<unsigned>(rc));
+        return -1;
+    }
+    return language;
+}
+
+// The game in the PS5's language, when the copy has it (store::library::apply_system_language).
+void apply_system_language(const std::string &app_root, const std::string &storage_root, int language)
+{
     store::library::InstallPlan plan;
     std::string done, error;
-    if (const int rc = sceSystemServiceParamGetInt(kParamLanguage, &language); rc != 0)
-        hui::sys::log("[STORE] language: system language unread rc=0x%08x", static_cast<unsigned>(rc));
+    if (language < 0)
+        hui::sys::log("[STORE] language: unknown, the copy's language file left alone");
     else if (!single_game_plan(app_root, storage_root, plan))
         hui::sys::log("[STORE] language: no plan");
     else if (!store::library::apply_system_language(plan, {storage_root, "/data/prospero-win"},
@@ -211,7 +223,7 @@ std::string return_request()
 [[noreturn]] void play_single_game(const char *why)
 {
     hui::sys::log("[STORE] %s: handing over to /app0/game.bin", why);
-    apply_system_language(store::system::app_folder(), "/data/sahin");
+    apply_system_language(store::system::app_folder(), "/data/sahin", system_language());
     const std::string request = return_request();
     // The start record first, then the request only if the record is there: a request left
     // without a record would bring the launcher back to play the game again. Without the
@@ -325,6 +337,13 @@ int main()
     // Wherever the store is installed (system/app_folder.hpp), now that the root may have changed.
     const std::string app_root = store::system::app_folder();
     sys::log("[STORE] app folder=%s", app_root.c_str());
+    // The page in the PS5's language: Turkish on a Turkish console, English on any other.
+    {
+        const int language = system_language();
+        store::i18n::set_language(store::i18n::from_console(language));
+        sys::log("[STORE] language: system %d, page %s", language,
+                 store::i18n::language() == store::i18n::Language::turkish ? "Turkish" : "English");
+    }
     // A game's own app shows its screen only when the game isn't installed yet, when the
     // game's in-game menu left choices to apply (or asked for this screen), when the game
     // closed right after it started, or when Square is held as it starts. Otherwise a start
@@ -446,7 +465,7 @@ int main()
         if (ingame)
             screen.set_ingame(*ingame);
         if (closed_early)
-            screen.set_single_notice(store::kEarlyExitHint);
+            screen.set_single_notice(store::i18n::trs(store::kEarlyExitHint));
     }
     else
         screen.play_intro();
@@ -752,8 +771,8 @@ int main()
                 store::diag::trace("job %s: %s - %s", update.entry.id.c_str(),
                                    update.message.c_str(), update.detail.c_str());
 #endif
-                screen.finish_job(update.ok, update.restart, std::move(update.message),
-                                  std::move(update.detail));
+                screen.finish_job(update.ok, update.cancelled, update.restart,
+                                  std::move(update.message), std::move(update.detail));
             }
             else if (update.kind == store::Update::Kind::locations)
                 screen.set_locations(std::move(update.locations));

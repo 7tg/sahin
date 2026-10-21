@@ -4,6 +4,7 @@
 
 #include "app/store.hpp"
 #include "catalog/blackbox.hpp"
+#include "core/i18n.hpp"
 #include "core/save_file.hpp"
 #include "install/transaction.hpp"
 #include "system/locations.hpp"
@@ -20,6 +21,10 @@
 namespace store
 {
 using namespace hui;
+using i18n::tr;
+using i18n::trc;
+using i18n::trf;
+using i18n::trs;
 namespace
 {
 using gfx::Color;
@@ -307,10 +312,10 @@ void Screen::set_setup_notes(std::vector<std::string> notes)
     if (setup_notes_.empty())
         return;
     const auto more = setup_notes_.size() - 1;
-    toasts_.push(ui::StatusKind::warning, "Check your ShadowMountPlus settings",
-                 more == 0 ? "Press Options and open About to see what the store found."
-                           : std::to_string(setup_notes_.size()) +
-                                 " things to check: press Options and open About.",
+    toasts_.push(ui::StatusKind::warning, trs("Check your ShadowMountPlus settings"),
+                 more == 0 ? trs("Press Options and open About to see what the store found.")
+                           : trf("{0} things to check: press Options and open About.",
+                                 {std::to_string(setup_notes_.size())}),
                  12.0f);
 }
 
@@ -649,7 +654,7 @@ void Screen::refresh_detail()
         blocks.push_back(Block::paragraph("This app is no longer listed in the catalog. "
                                           "Check with its developer before using it."));
     if (!app.detail_error.empty())
-        blocks.push_back(Block::paragraph("Details unavailable: " + app.detail_error));
+        blocks.push_back(Block::paragraph(trf("Details unavailable: {0}", {app.detail_error})));
     if (!single_game_.empty() && !single_notice_.empty())
         blocks.push_back(Block::paragraph(single_notice_));
     if (!single_game_.empty() && app.base_known && !app.game_installed)
@@ -659,24 +664,24 @@ void Screen::refresh_detail()
         const auto &base = app.base;
         if ((base.state == State::ready || base.state == State::needs_patch) && base.on_usb)
             blocks.push_back(Block::paragraph(
-                "Your copy is on the USB drive. Pick the options on the right, then Install: your "
-                "copy is copied to the console as part of it, and the USB copy is left as it "
-                "is."));
+                trs("Your copy is on the USB drive. Pick the options on the right, then Install: your "
+                    "copy is copied to the console as part of it, and the USB copy is left as it "
+                    "is.")));
         else if (base.state == State::ready || base.state == State::needs_patch)
             blocks.push_back(Block::paragraph(
-                "Your copy is ready. Pick the options on the right, then Install. Your copy is "
-                "left as it is; the game is built from it with its mods."));
+                trs("Your copy is ready. Pick the options on the right, then Install. Your copy is "
+                    "left as it is; the game is built from it with its mods.")));
         else
         {
             blocks.push_back(Block::paragraph(
-                "1. Install Blur, the PC game, on a computer. Leave it unmodded."));
+                trs("1. Install Blur, the PC game, on a computer. Leave it unmodded.")));
             blocks.push_back(Block::paragraph(
-                "2. Copy the whole game folder, the one with Blur.exe, to the PS5: over FTP to "
-                "/data/sahin/base-games/Blur (any case works), or to a USB drive as a folder named Blur at its top."));
+                trs("2. Copy the whole game folder, the one with Blur.exe, to the PS5: over FTP to "
+                    "/data/sahin/base-games/Blur (any case works), or to a USB drive as a folder named Blur at its top.")));
             blocks.push_back(Block::paragraph(
-                "3. This page notices the copy by itself. Then press Install."));
+                trs("3. This page notices the copy by itself. Then press Install.")));
             if (base.state != State::absent)
-                blocks.push_back(Block::paragraph("Found, but it can't be used: " + base.detail));
+                blocks.push_back(Block::paragraph(trf("Found, but it can't be used: {0}", {base.detail})));
         }
         if (!base.warning.empty())
             blocks.push_back(Block::paragraph(base.warning));
@@ -1296,10 +1301,10 @@ void Screen::update_page(const InputFrame &input, ui::Feedback &feedback)
             ask_ = Ask::game_options;
             ask_id_ = shown.title_id;
             dialog_.open({ui::StatusKind::question,
-                          (shown.game_installed ? "Repair " : "Install ") + shown.name + " with " +
-                              option.title + "?",
-                          option.description,
-                          {{"Cancel"}, {"No"}, {"Yes", ui::ButtonKind::primary}},
+                          trf(shown.game_installed ? "Repair {0} with {1}?" : "Install {0} with {1}?",
+                              {shown.name, tr(option.title)}),
+                          trs(option.description),
+                          {{trs("Cancel")}, {trs("No")}, {trs("Yes"), ui::ButtonKind::primary}},
                           option.on ? 2 : 1},
                          feedback);
         }
@@ -1542,9 +1547,9 @@ void Screen::update(const InputFrame &raw, float dt, ui::Feedback &feedback)
                         order(app, Order::Kind::install_game);
                     else
                         dialog_.open({ui::StatusKind::question,
-                                      "Repair " + app.name + " with " + app.game_options.front().title + "?",
-                                      app.game_options.front().description,
-                                      {{"Cancel"}, {"No"}, {"Yes", ui::ButtonKind::primary}},
+                                      trf("Repair {0} with {1}?", {app.name, tr(app.game_options.front().title)}),
+                                      trs(app.game_options.front().description),
+                                      {{trs("Cancel")}, {trs("No")}, {trs("Yes"), ui::ButtonKind::primary}},
                                       app.game_options.front().on ? 2 : 1},
                                      feedback);
                 }
@@ -1726,12 +1731,12 @@ const App *Screen::busy_app(float &progress, const char *&phase) const
         {
             using Phase = install::Phase;
             const auto now = static_cast<Phase>(activity_.phase);
-            phase = now == Phase::downloading ? "Downloading"
-                    : now == Phase::verifying ? "Verifying"
-                    : now == Phase::unpacking ? "Unpacking"
-                    : now == Phase::removing  ? "Removing"
-                    : now == Phase::copying   ? "Copying"
-                                              : "Installing";
+            phase = trc(now == Phase::downloading ? "Downloading"
+                        : now == Phase::verifying ? "Verifying"
+                        : now == Phase::unpacking ? "Unpacking"
+                        : now == Phase::removing  ? "Removing"
+                        : now == Phase::copying   ? "Copying"
+                                                  : "Installing");
             const bool measured =
                 (now == Phase::downloading || now == Phase::unpacking || now == Phase::copying) &&
                 activity_.total > 0;
@@ -2255,11 +2260,11 @@ void Screen::open_game_settings(const App &app, ui::Feedback &feedback)
     game_sheet_id_ = app.title_id;
     game_sheet_.style.theme = overlay_choice_.style.theme = theme_;
     game_sheet_.style.reduced_motion = overlay_choice_.style.reduced_motion = settings_.reduce_motion;
-    game_sheet_.set_title(app.name + " settings");
-    overlay_choice_.set_title("Performance overlay");
-    overlay_choice_.set_items({{"Off"},
-                               {"Frame rate", "A counter in the top-left corner"},
-                               {"Full", "Frame times, GPU load, draw calls"}});
+    game_sheet_.set_title(trf("{0} settings", {app.name}));
+    overlay_choice_.set_title(trs("Performance overlay"));
+    overlay_choice_.set_items({{trs("Off")},
+                               {trs("Frame rate"), trs("A counter in the top-left corner")},
+                               {trs("Full"), trs("Frame times, GPU load, draw calls")}});
     const auto known = settings_.overlays.find(app.title_id);
     overlay_choice_.set_selected(static_cast<int>(known == settings_.overlays.end() ? library::Overlay::off
                                                                                     : known->second));
@@ -2276,17 +2281,18 @@ void Screen::open_game_settings(const App &app, ui::Feedback &feedback)
                 // off is asked then).
                 ui::draw_button(canvas.list, canvas.fonts, ui::GlyphStyle::dark(), ui::Button::square,
                                 area.x + 16.0f, below + 4.0f, 30);
-                ui::text(canvas.list, canvas.fonts.semibold, "Repair", area.x + 44.0f, below + 12.0f, 22, kInk);
+                ui::text(canvas.list, canvas.fonts.semibold, tr("Repair"), area.x + 44.0f, below + 12.0f, 22, kInk);
                 ui::text(canvas.list, canvas.fonts.regular,
-                         app.game_options.empty() ? "Install it again from your copy"
-                                                  : "Install it again; " + app.game_options.front().title + " on or off",
+                         app.game_options.empty()
+                             ? trs("Install it again from your copy")
+                             : trf("Install it again; {0} on or off", {tr(app.game_options.front().title)}),
                          area.x + 44.0f, below + 40.0f, 17, kInk.with_alpha(0.6f));
                 below += 80.0f;
             }
         ui::paragraph(canvas.list, canvas.fonts.regular,
-                      "It shows from the next time the game starts, and stays through repairs. "
-                      "Full is DXVK's overlay; it also shows its command-stream thread, the "
-                      "game's drawing work on the CPU. The game's settings and saves don't change.",
+                      tr("It shows from the next time the game starts, and stays through repairs. "
+                         "Full is DXVK's overlay; it also shows its command-stream thread, the "
+                         "game's drawing work on the CPU. The game's settings and saves don't change."),
                       area.x, below, 19, area.w, 27,
                       kInk.with_alpha(0.6f), 5);
     };
@@ -2428,13 +2434,13 @@ std::string Screen::time_left() const
         return {};
     const float seconds = static_cast<float>(activity_.total - activity_.done) / rate_;
     if (seconds < 8.0f)
-        return "a few seconds left";
+        return trs("a few seconds left");
     if (seconds < 55.0f)
-        return "about " + std::to_string(static_cast<int>(std::ceil(seconds / 5.0f)) * 5) +
-               " s left";
+        return trf("about {0} s left",
+                   {std::to_string(static_cast<int>(std::ceil(seconds / 5.0f)) * 5)});
     if (seconds < 3600.0f * 3.0f)
-        return "about " + std::to_string(static_cast<int>(std::ceil(seconds / 60.0f))) +
-               " min left";
+        return trf("about {0} min left",
+                   {std::to_string(static_cast<int>(std::ceil(seconds / 60.0f)))});
     return {};
 }
 
@@ -2446,9 +2452,8 @@ void Screen::set_installer(bool available, bool guard, std::string reason, std::
     install_location_ = std::move(location);
 }
 
-void Screen::finish_job(bool ok, bool restart, std::string title, std::string body)
+void Screen::finish_job(bool ok, bool cancelled, bool restart, std::string title, std::string body)
 {
-    const bool cancelled = title.ends_with(": cancelled");
     quiet_ = ok && !cancelled;
     // The in-game choices are in: back to the game. A failure stays here and says why.
     if (std::exchange(play_after_, false) && ok && !cancelled)
@@ -2481,13 +2486,13 @@ Screen::Offer Screen::offer(const App &app) const
         const auto phase = waiting ? Phase::idle : static_cast<Phase>(activity_.phase);
         out.busy = true;
         out.tone = 1;
-        out.headline = phase == Phase::downloading  ? "Downloading"
-                       : phase == Phase::verifying  ? "Verifying"
-                       : phase == Phase::unpacking  ? "Unpacking"
-                       : phase == Phase::activating ? "Finishing"
-                       : phase == Phase::removing   ? "Removing"
-                       : phase == Phase::copying    ? "Copying"
-                                                    : "Waiting";
+        out.headline = trs(phase == Phase::downloading  ? "Downloading"
+                           : phase == Phase::verifying  ? "Verifying"
+                           : phase == Phase::unpacking  ? "Unpacking"
+                           : phase == Phase::activating ? "Finishing"
+                           : phase == Phase::removing   ? "Removing"
+                           : phase == Phase::copying    ? "Copying"
+                                                        : "Waiting");
         const bool game = !waiting && activity_.stage >= 0 && activity_.id == app.title_id;
         if (game)
             out.headline = library::kGameStages[activity_.stage];
@@ -2498,7 +2503,7 @@ Screen::Offer Screen::offer(const App &app) const
         {
             out.progress = tween::clamp01(static_cast<float>(activity_.done) /
                                           static_cast<float>(activity_.total));
-            out.note = megabytes(activity_.done) + " of " + megabytes(activity_.total);
+            out.note = trf("{0} of {1}", {megabytes(activity_.done), megabytes(activity_.total)});
             if (const auto left = time_left(); !waiting && !left.empty())
                 out.note += "  \xC2\xB7  " + left;
         }
@@ -2509,17 +2514,17 @@ Screen::Offer Screen::offer(const App &app) const
             out.progress = tween::clamp01(activity_.overall);
         }
         else
-            out.note = waiting ? "Queued behind another app" : "One moment";
+            out.note = trs(waiting ? "Queued behind another app" : "One moment");
         // Once the folder is being put in place there is nothing left to cancel.
         if (phase != Phase::activating && phase != Phase::removing)
         {
-            out.label = "Cancel";
+            out.label = trs("Cancel");
             out.primary = Order::Kind::cancel;
             out.armed = true;
         }
-        out.reason = game ? "Your game copy is never changed. The old install stays until this "
-                            "one checks out."
-                          : "The app's folder is only changed once everything is verified and unpacked.";
+        out.reason = trs(game ? "Your game copy is never changed. The old install stays until this "
+                                "one checks out."
+                              : "The app's folder is only changed once everything is verified and unpacked.");
         return out;
     }
 
@@ -2613,55 +2618,55 @@ Screen::Offer Screen::offer(const App &app) const
             const bool wine_running = blocking != running_.end();
             // A copy a release behind is brought up to date by its upgrade file as it installs.
             out.primary = Order::Kind::install_game;
-            out.label = app.game_installed ? "Repair" : "Install";
+            out.label = trs(app.game_installed ? "Repair" : "Install");
             if (!single_game_.empty() && app.game_installed && !single_options_change(app))
             {
                 // Its own app: playing is the thing to do, unless an option was changed.
                 out.primary = Order::Kind::play;
-                out.label = "Play";
+                out.label = trs("Play");
             }
             out.uninstall = app.game_installed;
-            out.headline = app.game_installed ? "Installed" : "Ready to install";
+            out.headline = trs(app.game_installed ? "Installed" : "Ready to install");
             out.tone = app.game_installed ? 2 : 1;
             if (!installer_)
                 out.reason = installer_reason_;
             else if (wine_running)
             {
                 // Said in the headline too: the button rests until the game is closed.
-                out.headline = "Game is open";
-                out.note = "Close " + *blocking + " to install";
+                out.headline = trs("Game is open");
+                out.note = trf("Close {0} to install", {*blocking});
                 out.tone = 0;
-                out.reason = "A game saves its settings as it closes. If it's already closed, "
-                             "restart the console.";
+                out.reason = trs("A game saves its settings as it closes. If it's already closed, "
+                                 "restart the console.");
             }
             else
             {
                 out.armed = true;
-                out.reason = out.primary == Order::Kind::play
-                                 ? "Hold Square as Sahin starts to come back to this page."
-                             : base.on_usb
-                                 ? "Copies your game from the USB drive to the console first. "
-                                   "The USB copy is left as it is."
-                             : app.game_installed
-                                 ? "Builds the game again from the base copy and its mods. Saves "
-                                   "stay."
-                             : !single_game_.empty()
-                                 ? "Your copy with the mods and settings. Every file is checked first."
-                                 : "Adds the mods and settings and puts the game on the Home "
-                                   "screen. Every file is checked first.";
+                out.reason = trs(out.primary == Order::Kind::play
+                                     ? "Hold Square as Sahin starts to come back to this page."
+                                 : base.on_usb
+                                     ? "Copies your game from the USB drive to the console first. "
+                                       "The USB copy is left as it is."
+                                 : app.game_installed
+                                     ? "Builds the game again from the base copy and its mods. Saves "
+                                       "stay."
+                                 : !single_game_.empty()
+                                     ? "Your copy with the mods and settings. Every file is checked first."
+                                     : "Adds the mods and settings and puts the game on the Home "
+                                       "screen. Every file is checked first.");
             }
         }
         else
         {
-            out.headline = base.state == State::absent ? "Base game needed" : "Base game can't be used";
+            out.headline = trs(base.state == State::absent ? "Base game needed" : "Base game can't be used");
             if (!single_game_.empty())
             {
                 // Its own app: the steps are the page's text.
-                out.headline = base.state == State::absent ? "Waiting for your copy" : "Copy can't be used";
-                out.note = "Follow the steps on the left";
+                out.headline = trs(base.state == State::absent ? "Waiting for your copy" : "Copy can't be used");
+                out.note = trs("Follow the steps on the left");
             }
             out.reason = base.state == State::absent
-                             ? "Your own copy of Blur, unmodded. Sahin adds what it needs."
+                             ? trs("Your own copy of Blur, unmodded. Sahin adds what it needs.")
                              : base.path;
         }
         return out;
@@ -2740,11 +2745,11 @@ void Screen::draw_job_card(const ui::Fonts &fonts, std::uint32_t glass)
              fonts.semibold.font->fit(std::string(phase) + " " + busy->name, 24, w), x,
              card.y + 46.0f, 24, kInk);
     std::string line = progress >= 0.0f ? std::to_string(static_cast<int>(progress * 100.0f)) + "%"
-                                        : std::string("One moment");
+                                        : trs("One moment");
     if (const auto left = time_left(); !left.empty() && progress >= 0.0f)
         line += "  \xC2\xB7  " + left;
     if (!activity_.waiting.empty())
-        line += "  \xC2\xB7  " + std::to_string(activity_.waiting.size()) + " queued";
+        line += "  \xC2\xB7  " + trf("{0} queued", {std::to_string(activity_.waiting.size())});
     ui::text(list, fonts.regular, fonts.regular.font->fit(line, 19, w), x, card.y + 74.0f, 19,
              kInk.with_alpha(0.7f));
     const Rect track{x, card.y + 88.0f, w, 5.0f};
@@ -2831,9 +2836,9 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
             list.arc(cx, cy, radius, 10.0f, time_ * 3.4f, 1.7f, kAccent);
         // Inside the ring: at this height its inner edge leaves about 130 px.
         ui::text(list, fonts.semibold,
-                 fonts.semibold.font->fit(ui::upper(state.headline), 13, 110.0f), cx, cy + 42.0f,
+                 fonts.semibold.font->fit(i18n::upper(state.headline), 13, 110.0f), cx, cy + 42.0f,
                  13, kInk.with_alpha(0.62f), gfx::Align::center, 2.0f);
-        const char *names[] = {"Download", "Verify", "Unpack", "Finish"};
+        const char *names[] = {trc("Download"), trc("Verify"), trc("Unpack"), trc("Finish")};
         const int step = !mine                         ? -1
                          : phase == Phase::downloading ? 0
                          : phase == Phase::verifying   ? 1
@@ -2859,7 +2864,7 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
             }
             else
                 list.ring(px, y, 10.0f, 2.0f, kInk.with_alpha(0.28f));
-            ui::text(list, fonts.semibold, ui::upper(names[i]), px, y + 38.0f, 14,
+            ui::text(list, fonts.semibold, i18n::upper(names[i]), px, y + 38.0f, 14,
                      kInk.with_alpha(i <= step ? 0.9f : 0.42f), gfx::Align::center, 2.0f);
         }
         ui::text(list, fonts.regular, fonts.regular.font->fit(state.note, 20, w), cx,
@@ -2891,15 +2896,15 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
         ui::text(list, fonts.regular, fonts.regular.font->fit(state.note, 21, w), cx,
                  box.y + 362.0f, 21, kInk.with_alpha(0.66f), gfx::Align::center);
         // Where it goes, and the room there; or where it is.
-        std::string where = "Installs to " + settings_.location;
+        std::string where = trf("Installs to {0}", {settings_.location});
         for (const auto &[path, free] : locations_)
             if (path == settings_.location)
-                where += "  \xC2\xB7  " + size_text(free) + " free";
+                where += "  \xC2\xB7  " + trf("{0} free", {size_text(free)});
         if (!app.installed.empty())
             where = app.installed.front().path;
         if (state.primary == Order::Kind::install_game || state.primary == Order::Kind::play)
-            where = std::string(app.game_installed ? "In" : "Installs into") + " the Wine prefix " +
-                    (settings_.game_prefix.empty() ? "sahin" : settings_.game_prefix);
+            where = trf(app.game_installed ? "In the Wine prefix {0}" : "Installs into the Wine prefix {0}",
+                        {settings_.game_prefix.empty() ? "sahin" : settings_.game_prefix});
         if (state.primary != Order::Kind::none)
             ui::text(list, fonts.regular, fonts.regular.font->fit(where, 18, w), cx, box.y + 396.0f,
                      18, kInk.with_alpha(0.46f), gfx::Align::center);
@@ -2929,7 +2934,7 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
         else
             list.bordered_rect(button, kButtonRadius, kAccent.with_alpha(0.08f), 2.0f,
                                kAccent.with_alpha(state.armed ? 1.0f : 0.5f));
-        const std::string label = destructive && hold_shown() ? "Hold to uninstall" : state.label;
+        const std::string label = destructive && hold_shown() ? trs("Hold to uninstall") : state.label;
         const float tw = fonts.semibold.measure(label, 28);
         ui::draw_button(list, fonts, filled ? ui::GlyphStyle::light() : ui::GlyphStyle::dark(),
                         ui::Button::cross, button.cx() - tw * 0.5f - 22.0f, button.cy(), 32);
@@ -2945,7 +2950,7 @@ void Screen::draw_action_box(const ui::Fonts &fonts, std::uint32_t glass, const 
         const Rect second{x, button.y + 82.0f, w, 50.0f};
         list.bordered_rect(second, 16, kClear, 1.5f, kInk.with_alpha(0.3f));
         hold_fill(list, second, 16);
-        const char *label = hold_shown() ? "Hold to uninstall" : "Uninstall";
+        const char *label = trc(hold_shown() ? "Hold to uninstall" : "Uninstall");
         const float tw = fonts.semibold.measure(label, 22);
         ui::draw_button(list, fonts, ui::GlyphStyle::dark(), ui::Button::square,
                         second.cx() - tw * 0.5f - 20.0f, second.cy(), 28);
@@ -2977,8 +2982,8 @@ void Screen::draw_game_stages(const ui::Fonts &fonts, gfx::DrawList &list, const
     else
         list.arc(cx, cy, radius, 9.0f, time_ * 3.4f, 1.7f, kAccent);
     // Under the percentage: of the whole install (the stage is named in the list below).
-    const std::string caption = activity_.overall >= 0.0f ? "Installed" : state.headline;
-    ui::text(list, fonts.semibold, fonts.semibold.font->fit(ui::upper(caption), 12, 104.0f), cx,
+    const std::string caption = activity_.overall >= 0.0f ? trs("Installed") : state.headline;
+    ui::text(list, fonts.semibold, fonts.semibold.font->fit(i18n::upper(caption), 12, 104.0f), cx,
              cy + 36.0f, 12, kInk.with_alpha(0.62f), gfx::Align::center, 2.0f);
 
     // The stages, top to bottom: done ones checked with what they did, the one under way
@@ -3006,7 +3011,7 @@ void Screen::draw_game_stages(const ui::Fonts &fonts, gfx::DrawList &list, const
         else
             list.ring(dot, y, 10.0f, 2.0f, kInk.with_alpha(0.28f));
         const float tx = x + 46.0f, tw = w - 46.0f;
-        ui::text(list, fonts.semibold, library::kGameStages[i], tx, y + 7.0f, 20,
+        ui::text(list, fonts.semibold, tr(library::kGameStages[i]), tx, y + 7.0f, 20,
                  i == now ? kInk : kInk.with_alpha(i < now ? 0.82f : 0.4f));
         const std::string line =
             static_cast<std::size_t>(i) < activity_.stages.size() ? activity_.stages[i] : std::string{};
@@ -3051,10 +3056,10 @@ std::vector<Screen::SingleRow> Screen::single_rows(const App &app) const
 {
     std::vector<SingleRow> rows;
     for (const auto &option : single_options_)
-        rows.push_back({option.title, {"Off", "On"}, option.on ? 1 : 0, option.description});
+        rows.push_back({trs(option.title), {trs("Off"), trs("On")}, option.on ? 1 : 0, trs(option.description)});
     // The game's settings, kept at once (and written into an installed game's profile).
-    SingleRow resolution{"Resolution", {}, 0,
-                         "The picture the game draws. Lower is lighter on the console."};
+    SingleRow resolution{trs("Resolution"), {}, 0,
+                         trs("The picture the game draws. Lower is lighter on the console.")};
     // Nothing saved: the row shows the plan's own size, as the install will use it.
     const auto known = settings_.resolutions.find(app.title_id);
     const library::Resolution shown =
@@ -3068,12 +3073,12 @@ std::vector<Screen::SingleRow> Screen::single_rows(const App &app) const
     }
     rows.push_back(std::move(resolution));
     const auto overlay = settings_.overlays.find(app.title_id);
-    rows.push_back({"Performance overlay",
-                    {"Off", "Frame rate", "Full"},
+    rows.push_back({trs("Performance overlay"),
+                    {trs("Off"), trs("Frame rate"), trs("Full")},
                     static_cast<int>(overlay == settings_.overlays.end() ? library::Overlay::off
                                                                          : overlay->second),
-                    "Frame rate: a counter in the corner. Full: DXVK's frame times, GPU load and "
-                    "draw calls."});
+                    trs("Frame rate: a counter in the corner. Full: DXVK's frame times, GPU load and "
+                        "draw calls.")});
     return rows;
 }
 
@@ -3115,7 +3120,7 @@ void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, cons
         if (lit)
             list.bordered_rect({x - 14.0f, y, w + 28.0f, 92.0f}, 20, kInk.with_alpha(0.06f), 1.5f,
                                kAccent.with_alpha(0.55f));
-        ui::text(list, fonts.semibold, fonts.semibold.font->fit(ui::upper(rows[r].name), 15, w), x,
+        ui::text(list, fonts.semibold, fonts.semibold.font->fit(i18n::upper(rows[r].name), 15, w), x,
                  y + 28.0f, 15, kInk.with_alpha(lit ? 0.8f : 0.5f), gfx::Align::left, 3.0f);
         const auto count = static_cast<float>(rows[r].values.size());
         const float width = (w - 8.0f * (count - 1.0f)) / count;
@@ -3196,7 +3201,7 @@ void Screen::draw_page(const ui::Fonts &fonts, std::uint32_t glass)
         list.bordered_rect(kPageIcon, 30, kClear, 1.5f, kInk.with_alpha(0.2f));
     }
     if (single_game_.empty())
-        ui::text(list, fonts.semibold, ui::upper(app.local_only ? "installed" : app.kind), kInfoX, 362,
+        ui::text(list, fonts.semibold, i18n::upper(app.local_only ? "installed" : app.kind), kInfoX, 362,
                  20, kAccent, gfx::Align::left, 4.0f);
     ui::text(list, fonts.display, fonts.display.font->fit(app.name, 84, 1180.0f), kInfoX - 4.0f,
              450, 84, kInk);
@@ -3411,7 +3416,7 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
     if (!developer_.empty())
         home[homes++] = {ui::Button::circle, "All apps"};
     else
-        home[homes++] = {ui::Button::circle, "Hold to close"};
+        home[homes++] = {ui::Button::circle, trc("Hold to close")};
     // The page's row names the one thing Cross does for this app, when it can.
     const Offer state = focused() ? offer(*focused()) : Offer{};
     ui::Hint detail[6];
@@ -3419,25 +3424,25 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
     if (state.armed)
         detail[details++] = {ui::Button::cross, state.label.c_str()};
     if (state.uninstall && installer_ && guard_ && !state.busy)
-        detail[details++] = {ui::Button::square, "Uninstall"};
+        detail[details++] = {ui::Button::square, trc("Uninstall")};
     if (!single_game_.empty() && focused() && focused()->base_known && !state.busy)
-        detail[details++] = {ui::Button::dpad, "Choose"};
+        detail[details++] = {ui::Button::dpad, trc("Choose")};
     else if (single_game_.empty())
-        detail[details++] = {ui::Button::dpad, "Scroll"};
+        detail[details++] = {ui::Button::dpad, trc("Scroll")};
     // A game's own app has its choices on the page; Triangle repairs it once installed.
     if (!single_game_.empty() && focused() && focused()->game_installed && state.armed &&
         state.primary == Order::Kind::play)
-        detail[details++] = {ui::Button::triangle, "Repair"};
+        detail[details++] = {ui::Button::triangle, trc("Repair")};
     else if (single_game_.empty() && focused() && focused()->base_known)
-        detail[details++] = {ui::Button::triangle, "Game settings"};
+        detail[details++] = {ui::Button::triangle, trc("Game settings")};
     else if (single_game_.empty() && focused() && !focused()->local_only)
-        detail[details++] = {ui::Button::triangle, "Refresh"};
+        detail[details++] = {ui::Button::triangle, trc("Refresh")};
     // The collection is Sahin's own: no other developer is listed here.
     if (focused() && !focused()->local_only && !focused()->author.empty() &&
         !catalog::blackbox_game(focused()->title_id))
-        detail[details++] = {ui::Button::right_stick, "More by this developer"};
+        detail[details++] = {ui::Button::right_stick, trc("More by this developer")};
     if (single_game_.empty())
-        detail[details++] = {ui::Button::circle, "Back"};
+        detail[details++] = {ui::Button::circle, trc("Back")};
     // A hint row leaves as the next layer arrives, so two are never legible at once.
     scene_.push_opacity(1.0f - tween::clamp01(page * 3.0f));
     if (home_page)
@@ -3463,7 +3468,7 @@ void Screen::draw(gfx::Renderer &renderer, const ui::Fonts &fonts)
         // The bar that fills while Circle is held; full, the store closes.
         const float filled = tween::clamp01((close_hold_ - kCloseDelay) / kCloseHold);
         const float shown = tween::clamp01((close_hold_ - kCloseDelay) / 0.12f);
-        const char *words = "Keep holding to close Sahin";
+        const char *words = trc("Keep holding to close Sahin");
         const float width = fonts.semibold.measure(words, 24) + 132.0f;
         const Rect pill{(kWidth - width) * 0.5f, 842.0f, width, 76.0f};
         overlay_.push_opacity(shown);
@@ -3725,57 +3730,56 @@ void Screen::write_about()
     if (!setup_notes_.empty())
     {
         // What the store found in /data/shadowmount and what it did about it.
-        blocks.push_back(Block::heading("ShadowMountPlus settings to check", 3));
+        blocks.push_back(Block::heading(trs("ShadowMountPlus settings to check"), 3));
         blocks.push_back(Block::paragraph(
-            "Found in /data/shadowmount/config.ini and manual.lst. The store keeps working "
-            "where it says so; fixing the lines removes this note."));
+            trs("Found in /data/shadowmount/config.ini and manual.lst. The store keeps working "
+                "where it says so; fixing the lines removes this note.")));
         for (const auto &line : setup_notes_)
             blocks.push_back(Block::bullet(line));
     }
     if (!debug_lines_.empty())
     {
         // The debug build: what happened at each step, to photograph or send.
-        blocks.push_back(Block::heading("Debug trace", 3));
+        blocks.push_back(Block::heading(trs("Debug trace"), 3));
         blocks.push_back(Block::paragraph(
-            debug_file_.empty()
-                ? std::string("Not saved to a file: no writable /data or USB drive.")
-                : "Also saved to " + debug_file_ + "."));
+            debug_file_.empty() ? trs("Not saved to a file: no writable /data or USB drive.")
+                                : trf("Also saved to {0}.", {debug_file_})));
         for (const auto &line : debug_lines_)
             blocks.push_back(Block::bullet(line));
     }
-    blocks.push_back(Block::paragraph("Sahin installs, updates and uninstalls apps from "
-                                      "your selected homebrew catalog."));
+    blocks.push_back(Block::paragraph(trs("Sahin installs, updates and uninstalls apps from "
+                                          "your selected homebrew catalog.")));
     blocks.push_back(
-        Block::key_value("Version", self_version_.empty() ? "Unknown" : self_version_));
-    blocks.push_back(Block::key_value("Catalog", status_));
-    blocks.push_back(Block::key_value("Active API URL", active_catalog_url_));
-    blocks.push_back(Block::key_value("New apps go to", settings_.location));
-    blocks.push_back(Block::heading("How it keeps installs safe", 3));
+        Block::key_value(trs("Version"), self_version_.empty() ? trs("Unknown") : self_version_));
+    blocks.push_back(Block::key_value(trs("Catalog"), status_));
+    blocks.push_back(Block::key_value(trs("Active API URL"), active_catalog_url_));
+    blocks.push_back(Block::key_value(trs("New apps go to"), settings_.location));
+    blocks.push_back(Block::heading(trs("How it keeps installs safe"), 3));
     blocks.push_back(
-        Block::bullet("Signature verification is on by default. Turning it off trusts the "
-                      "selected feed's publisher without authenticating its catalog."));
+        Block::bullet(trs("Signature verification is on by default. Turning it off trusts the "
+                          "selected feed's publisher without authenticating its catalog.")));
     blocks.push_back(
-        Block::bullet("A download is checked against the catalog before it is unpacked."));
+        Block::bullet(trs("A download is checked against the catalog before it is unpacked.")));
     blocks.push_back(
-        Block::bullet("An app's folder is replaced in one step, only when the new one is "
-                      "complete. A running app is never touched."));
-    blocks.push_back(Block::heading("Please note", 3));
+        Block::bullet(trs("An app's folder is replaced in one step, only when the new one is "
+                          "complete. A running app is never touched.")));
+    blocks.push_back(Block::heading(trs("Please note"), 3));
     blocks.push_back(Block::paragraph(
-        "Apps are published by their own developers, who are responsible for their content "
-        "and licensing. A listing is not a security audit. Sahin and the catalog come "
-        "without warranty."));
-    blocks.push_back(Block::heading("Where things are", 3));
-    blocks.push_back(Block::key_value("Store files", "/data/sahin"));
-    blocks.push_back(Block::key_value("Logs", "/data/sahin/logs"));
-    blocks.push_back(Block::heading("Thanks", 3));
+        trs("Apps are published by their own developers, who are responsible for their content "
+            "and licensing. A listing is not a security audit. Sahin and the catalog come "
+            "without warranty.")));
+    blocks.push_back(Block::heading(trs("Where things are"), 3));
+    blocks.push_back(Block::key_value(trs("Store files"), "/data/sahin"));
+    blocks.push_back(Block::key_value(trs("Logs"), "/data/sahin/logs"));
+    blocks.push_back(Block::heading(trs("Thanks"), 3));
     blocks.push_back(Block::paragraph(
-        "ShadowMountPlus by drakmor puts installed apps on the home screen. Built with "
-        "ps5-opengl, the Homebrew UI Lab and the PS5 native app boilerplate, and with curl, "
-        "OpenSSL, zlib, miniz, Monocypher, yyjson, PicoSHA2, QR Code generator and stb. "
-        "Fonts: Inter, Montserrat and DejaVu Sans Mono."));
+        trs("ShadowMountPlus by drakmor puts installed apps on the home screen. Built with "
+            "ps5-opengl, the Homebrew UI Lab and the PS5 native app boilerplate, and with curl, "
+            "OpenSSL, zlib, miniz, Monocypher, yyjson, PicoSHA2, QR Code generator and stb. "
+            "Fonts: Inter, Montserrat and DejaVu Sans Mono.")));
     blocks.push_back(
-        Block::paragraph("Brought to you by BlackBearReloaded. Free software under the GPL, "
-                         "version 3 or later."));
+        Block::paragraph(trs("Brought to you by BlackBearReloaded. Free software under the GPL, "
+                             "version 3 or later.")));
     about_.set_content(std::move(blocks));
     about_.scroll_to(0, true);
 }
@@ -3869,7 +3873,7 @@ void Screen::update_panel(const InputFrame &input, ui::Feedback &feedback)
     {
         settings_.debug_log = !settings_.debug_log;
         if (settings_.debug_log)
-            notify("Debug log is on", "Repeat the problem, then open About.");
+            notify(trs("Debug log is on"), trs("Repeat the problem, then open About."));
     }
     else if (setting == 11)
     {
@@ -4074,7 +4078,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
     constexpr const char *kTabs[] = {"Downloads", "Settings", "About"};
     ui::text(list, fonts.semibold, "SAHIN", kMargin, 170.0f, 18, kAccent, gfx::Align::left,
              4.0f);
-    ui::text(list, fonts.display, kTabs[panel_tab_], kMargin - 3.0f, 248.0f, 64, kInk);
+    ui::text(list, fonts.display, tr(kTabs[panel_tab_]), kMargin - 3.0f, 248.0f, 64, kInk);
     for (int i = 0; i < 3; ++i)
     {
         const Rect entry{kMargin, 312.0f + 72.0f * static_cast<float>(i), 400.0f, 60.0f};
@@ -4086,7 +4090,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         }
         sign(list, i == 3 ? 30 : i, entry.x + 50.0f, entry.cy(),
              kInk.with_alpha(on ? 1.0f : 0.55f));
-        ui::text(list, fonts.semibold, kTabs[i], entry.x + 86.0f, centred(entry.cy(), 24), 24,
+        ui::text(list, fonts.semibold, tr(kTabs[i]), entry.x + 86.0f, centred(entry.cy(), 24), 24,
                  kInk.with_alpha(on ? 1.0f : 0.6f));
         if (i == 3 && !news_.empty() && settings_.news_seen != news_.front().id)
             pill(list, fonts, "New", entry.x + entry.w - 76.0f, entry.cy(), 30.0f, kAccent,
@@ -4102,7 +4106,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
     ui::draw_button(list, fonts, ui::GlyphStyle::dark(), ui::Button::l1, kMargin, 564.0f, 26);
     ui::draw_button(list, fonts, ui::GlyphStyle::dark(), ui::Button::r1,
                     kMargin + ui::button_width(ui::Button::l1, 26) + 8.0f, 564.0f, 26);
-    ui::text(list, fonts.regular, "Switch rooms",
+    ui::text(list, fonts.regular, tr("Switch rooms"),
              kMargin + 2.0f * ui::button_width(ui::Button::l1, 26) + 24.0f, centred(564.0f, 20), 20,
              kInk.with_alpha(0.5f));
 
@@ -4155,7 +4159,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
             list.bordered_rect(thumb, 12, kClear, 1.0f, kInk.with_alpha(0.18f));
             const bool working = i == 0 && !activity_.id.empty();
             float progress = -1.0f;
-            const char *phase = "Waiting";
+            const char *phase = trc("Waiting");
             if (working)
                 busy_app(progress, phase);
             const float tx = thumb.x + thumb.w + 28.0f;
@@ -4163,11 +4167,10 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
                      fonts.semibold.font->fit(app ? app->name : ids[i], 28, 560.0f), tx,
                      row.y + 50.0f, 28, kInk);
             std::string line =
-                working ? phase : "Waiting  \xC2\xB7  " + std::to_string(i) + " ahead";
+                working ? std::string(phase) : trf("Waiting  \xC2\xB7  {0} ahead", {std::to_string(i)});
             if (working && progress >= 0.0f)
             {
-                line += "  \xC2\xB7  " + size_text(activity_.done) + " of " +
-                        size_text(activity_.total);
+                line += "  \xC2\xB7  " + trf("{0} of {1}", {size_text(activity_.done), size_text(activity_.total)});
                 if (const auto left = time_left(); !left.empty())
                     line += "  \xC2\xB7  " + left;
             }
@@ -4200,10 +4203,10 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         if (ids.empty())
         {
             sign(list, 0, panel.cx(), panel.y + 170.0f, kInk.with_alpha(0.5f));
-            ui::text(list, fonts.semibold, "Nothing is being installed", panel.cx(),
+            ui::text(list, fonts.semibold, tr("Nothing is being installed"), panel.cx(),
                      panel.y + 236.0f, 30, kInk, gfx::Align::center);
             ui::text(list, fonts.regular,
-                     "Installs, updates and removals line up here, one at a time.", panel.cx(),
+                     tr("Installs, updates and removals line up here, one at a time."), panel.cx(),
                      panel.y + 276.0f, 22, kInk.with_alpha(0.6f), gfx::Align::center);
             y = panel.y + 330.0f;
         }
@@ -4211,7 +4214,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         if (!history_.empty())
         {
             list.rounded_rect({px, y + 8.0f, pw, 1.0f}, 0, kInk.with_alpha(0.12f));
-            ui::text(list, fonts.semibold, "FINISHED", px, y + 52.0f, 16, kInk.with_alpha(0.55f),
+            ui::text(list, fonts.semibold, tr("FINISHED"), px, y + 52.0f, 16, kInk.with_alpha(0.55f),
                      gfx::Align::left, 3.5f);
             y += 88.0f;
             const float line_x = px + 14.0f;
@@ -4248,7 +4251,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
         std::string room;
         for (const auto &[path, free] : locations_)
             if (path == settings_.location)
-                room = size_text(free) + " free";
+                room = trf("{0} free", {size_text(free)});
         const struct Row
         {
             int sign;
@@ -4257,14 +4260,14 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
             std::string value;
             bool on;
         } rows[] = {
-            {3, "Install location", "Where new apps go: a folder ShadowMountPlus scans.", 0, place,
-             true},
+            {3, trc("Install location"), trc("Where new apps go: a folder ShadowMountPlus scans."), 0,
+             place, true},
             {4, "Check for a newer Sahin", "Asked once at start; a notice appears.", 1, "",
              settings_.check_updates},
-            {5, "Sounds", "The interface's own sounds.", 1, "", settings_.sounds},
-            {6, "Vibration", "A light answer from the controller.", 1, "", settings_.vibration},
-            {8, "Reduce motion", "Nothing drifts, floats or slides; things fade instead.", 1, "",
-             settings_.reduce_motion},
+            {5, trc("Sounds"), trc("The interface's own sounds."), 1, "", settings_.sounds},
+            {6, trc("Vibration"), trc("A light answer from the controller."), 1, "", settings_.vibration},
+            {8, trc("Reduce motion"), trc("Nothing drifts, floats or slides; things fade instead."), 1,
+             "", settings_.reduce_motion},
             {4, "Official catalog", "homebrew.page, signed. With both on, its apps win a clash.", 1,
              "", settings_.use_official},
             {4, "Custom catalog", "Your own feed. With both on, its apps are added.", 1, "",
@@ -4285,9 +4288,9 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
              newer || restart_needed_},
             {1, "Development options", "Custom catalogs and signature verification.", 2, "Open",
              false},
-            {4, "Debug log", "Records every step for a report: see About, or debug-trace.txt.", 1,
-             "", settings_.debug_log},
-            {8, "Theme", "Each game's colours. Left and right choose.", 4,
+            {4, trc("Debug log"), trc("Records every step for a report: see About, or debug-trace.txt."),
+             1, "", settings_.debug_log},
+            {8, trc("Theme"), trc("Each game's colours. Left and right choose."), 4,
              theme_name(settings_.theme), true},
         };
         float y = panel.y + 32.0f;
@@ -4360,7 +4363,7 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
                      rows[i].on ? kOnAccent : kInk, 1.0f, kAllLayers);
             y += 106.0f;
         }
-        ui::text(list, fonts.regular, "Changes are saved as you make them.", kMargin, 640.0f, 20,
+        ui::text(list, fonts.regular, tr("Changes are saved as you make them."), kMargin, 640.0f, 20,
                  kInk.with_alpha(0.5f));
         ui::text(list, fonts.regular,
                  std::to_string(setting_focus_ + 1) + " / " + std::to_string(count), kMargin,
@@ -4383,29 +4386,29 @@ void Screen::draw_panel(const ui::Fonts &fonts, std::uint32_t glass)
             list.image(logo_, {cx - 48.0f, cy - 48.0f, 96.0f, 96.0f}, {0, 0, 1, 1}, kWhite,
                        logo_cutout_ ? 0.0f : 20.0f);
         ui::text(list, fonts.display, "Sahin", px + 150.0f, panel.y + 98.0f, 52, kInk);
-        ui::text(list, fonts.regular, "Blur on the PS5, from your own copy",
+        ui::text(list, fonts.regular, tr("Blur on the PS5, from your own copy"),
                  px + 152.0f, panel.y + 136.0f, 22, kInk.with_alpha(0.62f));
-        const float words = ui::text(list, fonts.regular, "Based on ProsperoStore by ", px + 152.0f,
+        const float words = ui::text(list, fonts.regular, tr("Based on ProsperoStore by "), px + 152.0f,
                                      panel.y + 168.0f, 22, kInk.with_alpha(0.62f));
         ui::text(list, fonts.semibold, "BlackBearReloaded", px + 152.0f + words, panel.y + 168.0f,
                  22, kInk);
         if (!self_version_.empty())
-            pill(list, fonts, "Version " + self_version_,
-                 px + pw - fonts.semibold.measure("Version " + self_version_, 21.0f) - 34.0f,
+            pill(list, fonts, trf("Version {0}", {self_version_}),
+                 px + pw - fonts.semibold.measure(trf("Version {0}", {self_version_}), 21.0f) - 34.0f,
                  panel.y + 92.0f, 36.0f, kInk.with_alpha(0.12f), kInk, 1.0f, kAllLayers);
         list.rounded_rect({px, panel.y + 194.0f, pw, 1.0f}, 0, kInk.with_alpha(0.12f));
         ui::Canvas canvas{list, fonts, glass, time_};
         about_.draw(canvas);
     }
-    const ui::Hint queue[] = {{ui::Button::cross, "Cancel"},
-                              {ui::Button::l1, "Rooms", ui::Button::r1},
-                              {ui::Button::circle, "Close"}};
-    const ui::Hint change[] = {{ui::Button::cross, "Change"},
-                               {ui::Button::l1, "Rooms", ui::Button::r1},
-                               {ui::Button::circle, development_options_ ? "Back" : "Close"}};
-    const ui::Hint read[] = {{ui::Button::dpad, "Scroll"},
-                             {ui::Button::l1, "Rooms", ui::Button::r1},
-                             {ui::Button::circle, "Close"}};
+    const ui::Hint queue[] = {{ui::Button::cross, trc("Cancel")},
+                              {ui::Button::l1, trc("Rooms"), ui::Button::r1},
+                              {ui::Button::circle, trc("Close")}};
+    const ui::Hint change[] = {{ui::Button::cross, trc("Change")},
+                               {ui::Button::l1, trc("Rooms"), ui::Button::r1},
+                               {ui::Button::circle, trc(development_options_ ? "Back" : "Close")}};
+    const ui::Hint read[] = {{ui::Button::dpad, trc("Scroll")},
+                             {ui::Button::l1, trc("Rooms"), ui::Button::r1},
+                             {ui::Button::circle, trc("Close")}};
     const bool jobs = !activity_.id.empty() || !activity_.waiting.empty();
     if (panel_tab_ == 0)
         ui::draw_hints(list, fonts, ui::GlyphStyle::dark(), queue + (jobs ? 0 : 1), jobs ? 3 : 2,

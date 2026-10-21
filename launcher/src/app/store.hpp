@@ -205,7 +205,7 @@ class Screen
     // and the scanned folder new apps go to.
     void set_installer(bool available, bool guard, std::string reason, std::string location);
     void set_activity(Activity activity);
-    void finish_job(bool ok, bool restart, std::string title, std::string body);
+    void finish_job(bool ok, bool cancelled, bool restart, std::string title, std::string body);
     void set_settings(Settings settings)
     {
         active_catalog_url_ =

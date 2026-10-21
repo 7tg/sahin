@@ -34,6 +34,7 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
   the language file in its folder (`english.txt` in an English copy: English, French and
   Italian); Sahin renames that file as the game starts. Blur has no Turkish; a language
   your copy doesn't have leaves it as it is.
+- Sahin's own page is in Turkish on a console set to Turkish, and in English on any other.
 
 ## What you need
 

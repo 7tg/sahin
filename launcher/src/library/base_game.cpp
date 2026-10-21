@@ -1,6 +1,7 @@
 // Prospero BlackBox - The user's clean copy of a game: found, checked, imported.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "library/base_game.hpp"
+#include "core/i18n.hpp"
 #include "library/tree.hpp"
 #include "third_party/miniz/miniz.h"
 #include <cerrno>
@@ -190,7 +191,7 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
     if (!missing.empty())
     {
         result.state = State::incomplete;
-        result.detail = "Missing " + join(missing) + ". Copy the whole game folder.";
+        result.detail = i18n::trf("Missing {0}. Copy the whole game folder.", {join(missing)});
         return result;
     }
     std::vector<std::string> mods;
@@ -199,12 +200,13 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
             mods.emplace_back(name);
     std::string left; // what the page adds about mods that are left out
     if (!mods.empty() && manifest.mods_left_out)
-        left = " Mods found (" + join(mods) + ") are left out: the install adds its own.";
+        left = " " + i18n::trf("Mods found ({0}) are left out: the install adds its own.", {join(mods)});
     else if (!mods.empty())
     {
         result.state = State::modified;
-        result.detail = "Mods are installed in it (" + join(mods) +
-                        "). Copy a clean install: the mods are added for you.";
+        result.detail = i18n::trf("Mods are installed in it ({0}). Copy a clean install: the mods are "
+                                  "added for you.",
+                                  {join(mods)});
         return result;
     }
     const auto version_path = find_entry(folder, manifest.version_file);
@@ -213,7 +215,7 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
     if (!is_file(version_path, &size) || !cached_crc_of(version_path, crc))
     {
         result.state = State::incomplete;
-        result.detail = std::string("Can't read ") + manifest.version_file + ".";
+        result.detail = i18n::trf("Can't read {0}.", {manifest.version_file});
         return result;
     }
     for (const auto &release : manifest.releases)
@@ -222,9 +224,9 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
             result.state = release.needs_patch ? State::needs_patch : State::ready;
             result.version = release.version;
             result.detail = release.needs_patch
-                                ? "Version " + result.version + ": upgraded to " +
-                                      manifest.releases.front().version + " as it installs."
-                                : "Version " + result.version + ".";
+                                ? i18n::trf("Version {0}: upgraded to {1} as it installs.",
+                                            {result.version, manifest.releases.front().version})
+                                : i18n::trf("Version {0}.", {result.version});
             result.detail += left;
             return result;
         }
@@ -232,15 +234,15 @@ BaseGame inspect(const std::string &folder, const Manifest &manifest)
     {
         result.state = State::ready;
         result.version = manifest.releases.front().version;
-        result.warning = std::string(manifest.version_file) +
-                         " is not the one we know: installing anyway.";
-        result.detail = "Version " + result.version + " (unchecked)." + left;
+        result.warning =
+            i18n::trf("{0} is not the one we know: installing anyway.", {manifest.version_file});
+        result.detail = i18n::trf("Version {0} (unchecked).", {result.version}) + left;
         return result;
     }
     result.state = State::unknown;
-    result.detail = std::string(manifest.version_file) +
-                    " matches no release we know: the copy is modified, or it is a release we "
-                    "haven't seen. Copy a clean install.";
+    result.detail = i18n::trf("{0} matches no release we know: the copy is modified, or it is a "
+                              "release we haven't seen. Copy a clean install.",
+                              {manifest.version_file});
     return result;
 }
 
@@ -265,8 +267,9 @@ BaseGame locate(const std::string &data_root, std::span<const std::string> roots
     std::string shown = manifest.folder;
     for (std::size_t i = 1; i < shown.size(); i++)
         shown[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(shown[i])));
-    absent.detail = "Put a clean install in " + data_root + "/base-games/" + shown +
-                    " over FTP, or on a USB drive in a folder named " + shown + " (any case).";
+    absent.detail = i18n::trf("Put a clean install in {0}/base-games/{1} over FTP, or on a USB drive "
+                              "in a folder named {1} (any case).",
+                              {data_root, shown});
     return absent;
 }
 

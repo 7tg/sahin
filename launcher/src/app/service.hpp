@@ -44,7 +44,8 @@ struct Update
     std::uint64_t generation = 0;
     std::string message;
     bool ok = false;
-    bool restart = false; // the store updated itself: restart to finish
+    bool cancelled = false; // a job the player stopped: not a failure
+    bool restart = false;   // the store updated itself: restart to finish
     bool close = false;   // the update helper has the go-ahead: the store must close now
     std::vector<std::pair<std::string, std::uint64_t>> locations; // path, free bytes
     library::BaseGame base;

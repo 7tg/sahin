@@ -77,6 +77,7 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
   dosyasında yazar (İngilizce kopyada `english.txt`: İngilizce, Fransızca ve İtalyanca);
   Sahin oyun açılırken bu dosyanın adını değiştirir. Blur'un Türkçesi yoktur; kopyanızda
   olmayan bir dil seçiliyse oyunun dili değişmez.
+- **Sahin'in sayfası:** PS5'in dili Türkçeyse Türkçe, başka bir dilse İngilizce açılır.
 
 ## Bölünmüş ekran
 
