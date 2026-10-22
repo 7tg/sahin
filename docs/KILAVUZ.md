@@ -18,6 +18,7 @@ bulunur. Sahin'in Activision, Bizarre Creations veya Sony ile bir bağlantısı 
   kumanda.
 - **Çevrimiçi oyun:** Amax topluluk sunucuları üzerinden (varsayılan olarak açık).
 - Dokunmatik yüzey fare gibi çalışır.
+- Oyunda yazı yazmak için PS5'in kendi klavyesi açılır.
 - İsterseniz oyuna kendi kayıt dosyanızla başlayabilirsiniz.
 
 ## Gerekenler
@@ -70,6 +71,9 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
 - **Dokunmatik yüzey** fare imlecini hareket ettirir, basınca tıklar.
 - **Çıkmak için** Options tuşunu ve dokunmatik yüzeyi birlikte yaklaşık bir saniye basılı
   tutun.
+- **Yazı yazmak için** (Amax girişi, isim) dokunmatik yüzeyi basılı tutup △ tuşuna basın:
+  PS5'in klavyesi açılır, onayladığınız metin seçili alana yazılır. ABD klavyesindeki
+  karakterler (harfler, rakamlar, simgeler) yazılır; ç, ğ, ı, ö, ş, ü gibi diğerleri atlanır.
 - **Titreşim:** Blur istediğinde kumanda titrer; L2 ve R2 tetikleri de onunla birlikte
   titrer. Tetiklerdeki etkiyi PS5 ayarlarındaki tetik efekti yoğunluğu ile azaltabilir ya
   da kapatabilirsiniz.

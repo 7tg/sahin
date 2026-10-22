@@ -27,6 +27,9 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
   performance overlay, the two options above, Repair (△) and Play.
 - In the game, the touchpad moves the mouse pointer and pressing it clicks. To quit, hold
   Options and the touchpad together for about a second.
+- To type in the game (the Amax login, a name), hold the touchpad and press △: the PS5's
+  keyboard opens, and what you confirm is typed into the field that has the focus. It types
+  the characters of a US keyboard (letters, digits, symbols); others are left out.
 - The DualSense rumbles when Blur asks for it, and L2 and R2 vibrate with it. The PS5's
   trigger effect intensity setting (Accessibility or Accessories, Controllers) turns the
   triggers' part down or off.

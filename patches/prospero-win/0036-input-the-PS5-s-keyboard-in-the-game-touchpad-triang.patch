@@ -1,0 +1,665 @@
+From 678407c49c0bba72cb92399315ebfd2d130549cb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
+ <20913374+7tg@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 17:08:51 +0300
+Subject: [PATCH] input: the PS5's keyboard in the game, touchpad + triangle
+
+A player with only a DualSense had no way to type: a game's text field
+(a login, a name) took a USB keyboard or nothing. Holding the touchpad
+and pressing triangle now opens the system keyboard (libSceImeDialog)
+over the game, for the pad's user. What the player confirms is typed as
+the keys a US keyboard sends for it (src/pw_text_keys.c): Shift around a
+capital or a shifted symbol, one key event a frame, so a press and its
+release never share a frame; through the USB keyboard's path, so Wine's
+messages and DirectInput's scan codes both see it. Characters a US
+keyboard has no key for are skipped and counted. Enter is not added.
+
+From the chord's press until triangle is released, triangle is kept
+from the game (XInput Y and bindings; src/pw_ime_chord.c). The module
+is loaded early with the keyboard and mouse modules; CommonDialog, which
+the payload SDK omits, links through a facade as the store launcher's
+does. The log has the dialog's results and key counts, never the text.
+---
+ Makefile                          |  4 +-
+ native/pw_ime_ps5.c               | 99 +++++++++++++++++++++++++++++++
+ native/pw_ime_ps5.h               | 41 +++++++++++++
+ native/stubs/libSceCommonDialog.c |  4 ++
+ native/wine64_main.c              | 50 +++++++++++++++-
+ src/pw_ime_chord.c                | 16 +++++
+ src/pw_ime_chord.h                | 21 +++++++
+ src/pw_text_keys.c                | 65 ++++++++++++++++++++
+ src/pw_text_keys.h                | 26 ++++++++
+ tests/test_pw_ime_chord.c         | 41 +++++++++++++
+ tests/test_pw_text_keys.c         | 87 +++++++++++++++++++++++++++
+ tools/build_native.sh             | 11 +++-
+ 12 files changed, 461 insertions(+), 4 deletions(-)
+ create mode 100644 native/pw_ime_ps5.c
+ create mode 100644 native/pw_ime_ps5.h
+ create mode 100644 native/stubs/libSceCommonDialog.c
+ create mode 100644 src/pw_ime_chord.c
+ create mode 100644 src/pw_ime_chord.h
+ create mode 100644 src/pw_text_keys.c
+ create mode 100644 src/pw_text_keys.h
+ create mode 100644 tests/test_pw_ime_chord.c
+ create mode 100644 tests/test_pw_text_keys.c
+
+diff --git a/Makefile b/Makefile
+index 9dcc796..b72de8f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -70,6 +70,8 @@ $(eval $(call test_rule,test_vk_codec,tests/test_vk_codec.c wine/ps5/vulkan/pw_v
+ $(eval $(call test_rule,test_vk_wire,tests/test_vk_wire.c wine/ps5/pw_vk_wire.c wine/ps5/pw_vk_template_cache.c,-Iwine/ps5))
+ $(eval $(call test_rule,test_pw_wine_library,tests/test_pw_wine_library.c native/pw_wine_library.c src/pw_game_profile.c src/pw_app_profile.c src/pw_profile_catalog.c,-D_DEFAULT_SOURCE))
+ $(eval $(call test_rule,test_pw_hid,tests/test_pw_hid.c src/pw_hid.c,))
++$(eval $(call test_rule,test_pw_text_keys,tests/test_pw_text_keys.c src/pw_text_keys.c,))
++$(eval $(call test_rule,test_pw_ime_chord,tests/test_pw_ime_chord.c src/pw_ime_chord.c,))
+ $(eval $(call test_rule,test_pw_spinner,tests/test_pw_spinner.c src/pw_spinner.c,))
+ $(eval $(call test_rule,test_pw_hid_ps5,tests/test_pw_hid_ps5.c native/pw_hid_ps5.c src/pw_hid.c,-DPW_HID_PS5_HOST_TEST))
+ $(eval $(call test_rule,test_pw_wine_display,tests/test_pw_wine_display.c native/pw_wine_display.c src/pw_game_profile.c src/pw_app_profile.c src/pw_script_input.c,-pthread))
+@@ -144,7 +146,7 @@ $(eval $(call test_rule,test_pw_key_shared,tests/test_pw_key_shared.c,))
+ 
+ TESTS := test_pw_qpc_clock test_pw_key_shared test_pw_diagnostics test_pw_x86_hostexec test_pw_app_profile test_pw_profile_catalog test_pw_present \
+ 	test_pw_wine_heap test_pw_wine_dmem test_pw_wine_dmem_ps5 test_pw_wine_prx test_pw_wine_start test_pw_wine_launch test_pw_script_input test_pw_game_profile test_pw_prefix_temp test_pw_tsc_calibrate test_pw_wine_prefix_cpu test_vk_command_stream test_vk_spsc test_vk_replay test_vk_wire test_vk_codec \
+-	test_pw_wine_library test_pw_wine_display test_pw_hid test_pw_hid_ps5 test_pw_spinner test_pw_wine_dl test_pw_wine_sink \
++	test_pw_wine_library test_pw_wine_display test_pw_hid test_pw_hid_ps5 test_pw_text_keys test_pw_ime_chord test_pw_spinner test_pw_wine_dl test_pw_wine_sink \
+ 	test_pw_wine_threads test_pw_wine_compat test_pw_wine_cwd test_pw_wine_cwd_listing test_pw_ws2_32_libc test_pw_launcher_render test_pw_pad \
+ 	test_pw_guest_fp test_pw_vm test_pw_x86_block test_pw_x86_flat test_pw_x86_cache test_pw_x86_code_pages test_pw_wow_smc_pages test_pw_wow_thread_budget test_pw_wow_tsc_clock test_pw_wow_call_top \
+ 	test_pw_x86_engine test_pw_x86_chaining test_pw_x86_residency test_pw_x86_global_residency test_pw_x86_reencode test_pw_x86_smc test_pw_x86_fault_markers test_pw_x86_lazyflags \
+diff --git a/native/pw_ime_ps5.c b/native/pw_ime_ps5.c
+new file mode 100644
+index 0000000..d09b486
+--- /dev/null
++++ b/native/pw_ime_ps5.c
+@@ -0,0 +1,99 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "pw_ime_ps5.h"
++#include <stddef.h>
++#include <stdio.h>
++#include <string.h>
++
++typedef struct ImeParam {
++    int32_t user_id, type;
++    uint64_t supported_languages;
++    int32_t enter_label, input_method;
++    void *filter;
++    uint32_t option, max_text_length;
++    uint16_t *input_text_buffer;
++    float pos_x, pos_y;
++    int32_t horizontal_alignment, vertical_alignment;
++    const uint16_t *placeholder, *title;
++    int8_t reserved[16];
++} ImeParam;
++typedef struct ImeResult {
++    int32_t outcome;
++    int8_t reserved[12];
++} ImeResult;
++_Static_assert(sizeof(ImeParam) == 96, "sceImeDialogInit's parameter");
++_Static_assert(offsetof(ImeParam, input_text_buffer) == 40, "sceImeDialogInit's parameter");
++_Static_assert(offsetof(ImeParam, title) == 72, "sceImeDialogInit's parameter");
++_Static_assert(sizeof(ImeResult) == 16, "sceImeDialogGetResult's result");
++
++int sceSysmoduleLoadModule(uint16_t id);
++int sceCommonDialogInitialize(void);
++int sceImeDialogInit(const ImeParam *param, const void *extended);
++int sceImeDialogGetStatus(void);
++int sceImeDialogGetResult(ImeResult *result);
++int sceImeDialogTerm(void);
++
++enum { IME_MODULE = 0x0096, STATUS_RUNNING = 1, STATUS_FINISHED = 2 };
++/* Common dialogs already initialised (by this process, earlier). */
++#define COMMON_DIALOG_ALREADY 0x80b80002u
++
++static const uint16_t title[] = { 'S', 'a', 'h', 'i', 'n', 0 };
++static const uint16_t placeholder[] = { 0 };
++
++void pw_ime_ps5_preload(void (*log)(const char *line))
++{
++    char line[96];
++    int module = sceSysmoduleLoadModule(IME_MODULE);
++    int dialogs = sceCommonDialogInitialize();
++
++    snprintf(line, sizeof(line), "preload libSceImeDialog id=%#x status=%#x common_dialog=%#x",
++             (unsigned)IME_MODULE, (unsigned)module, (unsigned)dialogs);
++    if (log) log(line);
++}
++
++int pw_ime_ps5_open(PwImePs5 *ime, int32_t user_id, uint64_t now_ns)
++{
++    ImeParam param;
++    int dialogs, status;
++
++    if (!ime || ime->active) return -1;
++    dialogs = sceCommonDialogInitialize();
++    if (dialogs < 0 && (uint32_t)dialogs != COMMON_DIALOG_ALREADY) return dialogs;
++    memset(&param, 0, sizeof(param));
++    memset(ime->text, 0, sizeof(ime->text));
++    param.user_id = user_id;
++    param.max_text_length = PW_IME_PS5_TEXT;
++    param.input_text_buffer = ime->text;
++    param.horizontal_alignment = param.vertical_alignment = 1;
++    param.placeholder = placeholder;
++    param.title = title;
++    status = sceImeDialogInit(&param, NULL);
++    if (status != 0) return status;
++    ime->active = 1;
++    ime->opened_ns = now_ns;
++    return 0;
++}
++
++PwImePs5State pw_ime_ps5_poll(PwImePs5 *ime, uint64_t now_ns)
++{
++    PwImePs5State state = PW_IME_PS5_FAILED;
++    int status;
++
++    if (!ime || !ime->active) return PW_IME_PS5_IDLE;
++    status = sceImeDialogGetStatus();
++    /* The status reads 0 for a moment after the init (measured by the
++     * store launcher): still showing. */
++    if (status == STATUS_RUNNING || (status == 0 && now_ns - ime->opened_ns < 1000000000u))
++        return PW_IME_PS5_SHOWING;
++    if (status == STATUS_FINISHED) {
++        ImeResult result;
++
++        memset(&result, 0, sizeof(result));
++        if (sceImeDialogGetResult(&result) >= 0)
++            state = result.outcome == 0 ? PW_IME_PS5_ACCEPTED : PW_IME_PS5_CANCELLED;
++    }
++    /* The system may still own the dialog; ask again next frame. */
++    if (sceImeDialogTerm() < 0) return PW_IME_PS5_SHOWING;
++    ime->active = 0;
++    if (state != PW_IME_PS5_ACCEPTED) memset(ime->text, 0, sizeof(ime->text));
++    return state;
++}
+diff --git a/native/pw_ime_ps5.h b/native/pw_ime_ps5.h
+new file mode 100644
+index 0000000..a62aef0
+--- /dev/null
++++ b/native/pw_ime_ps5.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef PW_IME_PS5_H
++#define PW_IME_PS5_H
++/*
++ * The PS5's own keyboard (libSceImeDialog), over the game: opened by the
++ * pad's chord (src/pw_ime_chord.h) and polled once a frame, never waited
++ * for. The system loads the module (sceSysmoduleLoadModule 0x96, as the
++ * keyboard and mouse modules: a title may not load them by path) and owns
++ * the pad while the dialog shows. The parameter layout is the one
++ * ProsperoRadio's keyboard and the store launcher use on hardware:
++ *
++ *   param, 96 bytes: s32 user, type; u64 languages; s32 enter label,
++ *     input method; void *filter; u32 option, max length; u16 *text;
++ *     f32 x, y; s32 horizontal, vertical alignment; u16 *placeholder,
++ *     *title; 16 reserved bytes
++ *   result, 16 bytes: s32 outcome (0 accepted); 12 reserved bytes
++ */
++#include <stdint.h>
++
++enum { PW_IME_PS5_TEXT = 64 };   /* characters the player may type */
++
++typedef enum PwImePs5State {
++    PW_IME_PS5_IDLE = 0, PW_IME_PS5_SHOWING, PW_IME_PS5_ACCEPTED, PW_IME_PS5_CANCELLED,
++    PW_IME_PS5_FAILED,
++} PwImePs5State;
++
++typedef struct PwImePs5 {
++    int active;
++    uint64_t opened_ns;
++    uint16_t text[PW_IME_PS5_TEXT + 1];   /* UTF-16, NUL-terminated: what was accepted */
++} PwImePs5;
++
++/* Loads the module and readies the common dialogs early, with the
++ * keyboard and mouse modules (pw_hid_ps5_preload); logs both results. */
++void pw_ime_ps5_preload(void (*log)(const char *line));
++/* Shows an empty keyboard for user_id; 0, or the system's error. */
++int pw_ime_ps5_open(PwImePs5 *ime, int32_t user_id, uint64_t now_ns);
++/* SHOWING while the player types; then ACCEPTED (text in ime->text),
++ * CANCELLED or FAILED once, and IDLE after. */
++PwImePs5State pw_ime_ps5_poll(PwImePs5 *ime, uint64_t now_ns);
++#endif
+diff --git a/native/stubs/libSceCommonDialog.c b/native/stubs/libSceCommonDialog.c
+new file mode 100644
+index 0000000..ddb580b
+--- /dev/null
++++ b/native/stubs/libSceCommonDialog.c
+@@ -0,0 +1,4 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/* Link-only import facade; firmware supplies this implementation (the
++ * payload SDK has libSceImeDialog but not libSceCommonDialog). */
++int sceCommonDialogInitialize(void){return -1;}
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index 7f0624c..f4bc3ab 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -35,12 +35,15 @@
+ #include "pw_audio_ps5.h"
+ #include "pw_pad_ps5.h"
+ #include "pw_hid_ps5.h"
++#include "pw_ime_ps5.h"
+ #include "pw_videoout_ps5.h"
+ #include "pw_wine_library.h"
+ #include "pw_wine_prefix.h"
+ #include "../src/pw_present.h"
+ #include "../src/pw_spinner.h"
+ #include "../src/pw_tsc_calibrate.h"
++#include "../src/pw_ime_chord.h"
++#include "../src/pw_text_keys.h"
+ #include "pw_wine_display.h"
+ #include "../include/prospero_win.h"
+ 
+@@ -1026,12 +1029,20 @@ int main(int argc, char **argv)
+     PwPadPs5Ops pad_ops;
+     int status, video_status = PW_ERR_STATE, pad_status = PW_ERR_STATE, hid_status = PW_ERR_STATE;
+     uint64_t close_requested = 0, combo_ticks = 0, started = now_ns();
++    /* The system keyboard (touchpad + triangle) and the keys of what was
++     * typed in it, posted one a frame so a press and its release never
++     * share the frame a game samples its keys in. */
++    static PwImePs5 ime;
++    static PwImeChord ime_chord;
++    static PwHidEvent typing[4 * PW_IME_PS5_TEXT];
++    size_t typing_count = 0, typing_next = 0;
+ 
+     ps5log_config_defaults(&log_config);
+     if (ps5log_load_config(ps5log_default_conf_paths, ps5log_default_conf_path_count,
+                            &log_config, NULL) == 0)
+         ps5log_init(&log_config, PW_TITLE_ID, PW_APP_NAME, now_ns());
+     pw_hid_ps5_preload(hid_log);   /* before the /data grant changes the title's credentials */
++    pw_ime_ps5_preload(hid_log);
+     if (open_library() != 0) {
+         PS5LOG_LOG("PW_WINE64 startup blocked reason=data-helper-incomplete");
+         ps5log_close("data-helper-incomplete");
+@@ -1411,6 +1422,40 @@ int main(int argc, char **argv)
+         }
+ #endif
+         int pad_read = pad_status == PW_OK && post_input && pw_pad_ps5_read(&pad) == PW_OK;
++        uint32_t withheld = 0;   /* the keyboard chord's triangle, kept from the game */
++        if (pad_read) {
++            int chord;
++
++            withheld = pw_ime_chord_step(&ime_chord, pad.core.previous_buttons, pad.core.pressed_edges, &chord);
++            if (chord && !ime.active && typing_next == typing_count) {
++                int opened = pw_ime_ps5_open(&ime, pad.user_id, now);
++                PS5LOG_LOG("PW_WINE64 ime open rc=%#x user=%d", (unsigned)opened, (int)pad.user_id);
++            }
++        }
++        if (ime.active) {
++            PwImePs5State typed = pw_ime_ps5_poll(&ime, now);
++
++            if (typed == PW_IME_PS5_ACCEPTED) {
++                size_t skipped;
++                typing_count = pw_text_keys(ime.text, PW_IME_PS5_TEXT, typing,
++                                            sizeof(typing) / sizeof(typing[0]), &skipped);
++                typing_next = 0;
++                /* Never the text: it may be a password. */
++                PS5LOG_LOG("PW_WINE64 ime accepted keys=%u skipped=%u", (unsigned)typing_count,
++                           (unsigned)skipped);
++            } else if (typed != PW_IME_PS5_SHOWING) {
++                PS5LOG_LOG("PW_WINE64 ime %s", typed == PW_IME_PS5_CANCELLED ? "cancelled" : "failed");
++            }
++        }
++        if (post_input && typing_next < typing_count) {
++            PwWineInput key = { PW_WINE_INPUT_KEY, typing[typing_next].code, 0, 0, typing[typing_next].down };
++            if (post_input(&key) == 0) {
++                posted++;
++                typing_next++;
++            } else {
++                refused++;   /* again next frame */
++            }
++        }
+         /* XInput controller 0: the DualSense, and in a script build the
+          * macro's controller added to it, every frame, so a scripted press
+          * stays down until its release. */
+@@ -1421,6 +1466,7 @@ int main(int argc, char **argv)
+             scripted = script_input.pad_events != 0;
+             connected = pw_wine_script_pad(&state, connected, &script_pad, scripted);
+ #endif
++            if (withheld & PW_IME_CHORD_TRIANGLE) state.buttons &= (uint16_t)~0x8000u;   /* XINPUT_GAMEPAD_Y */
+             if (pad_read || scripted) set_pad(connected ? &state : NULL);
+         }
+         /* XInput controllers 1..3: the other signed-in users' DualSenses. A
+@@ -1444,8 +1490,8 @@ int main(int argc, char **argv)
+             }
+         }
+         if (pad_read) {
+-            size_t count = pw_wine_game_inputs(&game_input, pad.core.pressed_edges,
+-                                               pad.core.released_edges, events,
++            size_t count = pw_wine_game_inputs(&game_input, pad.core.pressed_edges & ~withheld,
++                                               pad.core.released_edges & ~withheld, events,
+                                                sizeof(events) / sizeof(events[0]) - 1);
+             if (game_input.mouse == PW_GAME_STICK_TOUCHPAD) {
+                 /* A finger's movement, as a laptop's touchpad: the pointer moves by
+diff --git a/src/pw_ime_chord.c b/src/pw_ime_chord.c
+new file mode 100644
+index 0000000..3ae34b7
+--- /dev/null
++++ b/src/pw_ime_chord.c
+@@ -0,0 +1,16 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "pw_ime_chord.h"
++
++uint32_t pw_ime_chord_step(PwImeChord *chord, uint32_t held, uint32_t pressed, int *open)
++{
++    uint32_t withhold;
++    int made = (pressed & PW_IME_CHORD_TRIANGLE) && (held & PW_IME_CHORD_TOUCHPAD);
++
++    if (open) *open = made;
++    if (!chord) return 0;
++    if (made) chord->withholding = 1;
++    withhold = chord->withholding ? PW_IME_CHORD_TRIANGLE : 0;
++    /* △'s release is withheld too, then it is the game's again. */
++    if (!(held & PW_IME_CHORD_TRIANGLE)) chord->withholding = 0;
++    return withhold;
++}
+diff --git a/src/pw_ime_chord.h b/src/pw_ime_chord.h
+new file mode 100644
+index 0000000..d47ebe8
+--- /dev/null
++++ b/src/pw_ime_chord.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef PW_IME_CHORD_H
++#define PW_IME_CHORD_H
++/*
++ * The system keyboard's chord: △ pressed while the touchpad is held opens
++ * it. From that press until △ is released, △ is withheld from the game
++ * (its XInput Y and any binding), so the chord doesn't also act in it.
++ */
++#include <stdint.h>
++
++enum { PW_IME_CHORD_TRIANGLE = 0x1000u, PW_IME_CHORD_TOUCHPAD = 0x100000u };
++
++typedef struct PwImeChord {
++    int withholding;    /* △ belongs to the chord until its release */
++} PwImeChord;
++
++/* One pad batch: the buttons held after it and the ones pressed in it.
++ * *open is 1 on the batch the chord is made; returns the DualSense buttons
++ * to withhold from the game in this batch. */
++uint32_t pw_ime_chord_step(PwImeChord *chord, uint32_t held, uint32_t pressed, int *open);
++#endif
+diff --git a/src/pw_text_keys.c b/src/pw_text_keys.c
+new file mode 100644
+index 0000000..8c779e2
+--- /dev/null
++++ b/src/pw_text_keys.c
+@@ -0,0 +1,65 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "pw_text_keys.h"
++
++enum { VK_SHIFT = 0x10 };
++
++/* The US layout's punctuation: unshifted, shifted, and their key. */
++static const struct { char plain, shifted; uint8_t vk; } symbols[] = {
++    { '-', '_', 0xbd }, { '=', '+', 0xbb }, { '[', '{', 0xdb }, { ']', '}', 0xdd },
++    { '\\', '|', 0xdc }, { ';', ':', 0xba }, { '\'', '"', 0xde }, { ',', '<', 0xbc },
++    { '.', '>', 0xbe }, { '/', '?', 0xbf }, { '`', '~', 0xc0 },
++};
++/* The digit row's shifted characters, from 0 to 9. */
++static const char digit_shifted[] = ")!@#$%^&*(";
++
++int pw_text_key(uint32_t c, uint8_t *vk, int *shift)
++{
++    uint8_t key = 0;
++    int shifted = 0;
++
++    if (c >= 'a' && c <= 'z') key = (uint8_t)(c - 'a' + 'A');
++    else if (c >= 'A' && c <= 'Z') key = (uint8_t)c, shifted = 1;
++    else if (c >= '0' && c <= '9') key = (uint8_t)c;
++    else if (c == ' ') key = 0x20;
++    else if (c > ' ' && c < 0x7f) {
++        for (unsigned i = 0; !key && i < 10; i++)
++            if ((uint32_t)(unsigned char)digit_shifted[i] == c) key = (uint8_t)('0' + i), shifted = 1;
++        for (size_t i = 0; !key && i < sizeof(symbols) / sizeof(symbols[0]); i++) {
++            if ((uint32_t)(unsigned char)symbols[i].plain == c) key = symbols[i].vk;
++            else if ((uint32_t)(unsigned char)symbols[i].shifted == c) key = symbols[i].vk, shifted = 1;
++        }
++    }
++    if (!key) return 0;
++    if (vk) *vk = key;
++    if (shift) *shift = shifted;
++    return 1;
++}
++
++size_t pw_text_keys(const uint16_t *text, size_t length, PwHidEvent *out, size_t capacity,
++                    size_t *skipped)
++{
++    size_t count = 0, missing = 0;
++
++    if (skipped) *skipped = 0;
++    if (!text || !out) return 0;
++    for (size_t i = 0; i < length && text[i]; i++) {
++        uint8_t vk;
++        int shift;
++
++        if (!pw_text_key(text[i], &vk, &shift)) {
++            /* A surrogate pair is one character. */
++            if (text[i] >= 0xd800 && text[i] <= 0xdbff && i + 1 < length &&
++                text[i + 1] >= 0xdc00 && text[i + 1] <= 0xdfff)
++                i++;
++            missing++;
++            continue;
++        }
++        if (count + (shift ? 4u : 2u) > capacity) break;
++        if (shift) out[count++] = (PwHidEvent){ PW_HID_EVENT_KEY, 1, VK_SHIFT };
++        out[count++] = (PwHidEvent){ PW_HID_EVENT_KEY, 1, vk };
++        out[count++] = (PwHidEvent){ PW_HID_EVENT_KEY, 0, vk };
++        if (shift) out[count++] = (PwHidEvent){ PW_HID_EVENT_KEY, 0, VK_SHIFT };
++    }
++    if (skipped) *skipped = missing;
++    return count;
++}
+diff --git a/src/pw_text_keys.h b/src/pw_text_keys.h
+new file mode 100644
+index 0000000..99fc478
+--- /dev/null
++++ b/src/pw_text_keys.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef PW_TEXT_KEYS_H
++#define PW_TEXT_KEYS_H
++/*
++ * Text typed as key presses: what the player confirmed in the system
++ * keyboard (UTF-16, as the dialog returns it) becomes the virtual keys a
++ * US keyboard would send for it, Shift around a capital or a shifted
++ * symbol. Wine's layout in the prefix maps them back to the characters, and
++ * a game reading DirectInput's scan codes sees them as well. Characters a US
++ * keyboard has no key for are skipped and counted.
++ */
++#include "pw_hid.h"
++#include <stddef.h>
++#include <stdint.h>
++
++/* The key that types c and whether it needs Shift; 0 when there is none
++ * (printable ASCII only). */
++int pw_text_key(uint32_t c, uint8_t *vk, int *shift);
++
++/* Up to length units of text, ending at a NUL, as key events: Shift down,
++ * key down, key up, Shift up for each character. Whole characters only, so
++ * a buffer too small ends at the last one that fits. Returns how many events
++ * were written; *skipped (when given) counts the characters with no key. */
++size_t pw_text_keys(const uint16_t *text, size_t length, PwHidEvent *out, size_t capacity,
++                    size_t *skipped);
++#endif
+diff --git a/tests/test_pw_ime_chord.c b/tests/test_pw_ime_chord.c
+new file mode 100644
+index 0000000..fea21d8
+--- /dev/null
++++ b/tests/test_pw_ime_chord.c
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "../src/pw_ime_chord.h"
++#include <assert.h>
++#include <stdio.h>
++
++enum { T = PW_IME_CHORD_TRIANGLE, P = PW_IME_CHORD_TOUCHPAD, X = 0x4000u };
++
++static void test_chord(void)
++{
++    PwImeChord c = { 0 };
++    int open;
++
++    /* △ alone: no keyboard, nothing withheld. */
++    assert(pw_ime_chord_step(&c, T, T, &open) == 0 && !open);
++    assert(pw_ime_chord_step(&c, 0, 0, &open) == 0 && !open);
++
++    /* Touchpad held, then △: the keyboard opens once, △ is withheld while held. */
++    assert(pw_ime_chord_step(&c, P, P, &open) == 0 && !open);
++    assert(pw_ime_chord_step(&c, P | T, T, &open) == T && open);
++    assert(pw_ime_chord_step(&c, P | T, 0, &open) == T && !open);
++    /* The touchpad let go first: △ stays withheld until its own release. */
++    assert(pw_ime_chord_step(&c, T | X, X, &open) == T && !open);
++    assert(pw_ime_chord_step(&c, X, 0, &open) == T && !open);    /* the release frame */
++    assert(pw_ime_chord_step(&c, X, 0, &open) == 0 && !open);
++
++    /* Pressed and released in one batch: opens, withheld that frame only. */
++    assert(pw_ime_chord_step(&c, P, T, &open) == T && open);
++    assert(pw_ime_chord_step(&c, P, 0, &open) == 0 && !open);
++
++    /* Both in the same batch count as the chord. */
++    assert(pw_ime_chord_step(&c, P | T, P | T, &open) == T && open);
++    assert(pw_ime_chord_step(&c, 0, 0, &open) == T && !open);
++    assert(pw_ime_chord_step(&c, 0, 0, &open) == 0 && !open);
++}
++
++int main(void)
++{
++    test_chord();
++    puts("test_pw_ime_chord: ok");
++    return 0;
++}
+diff --git a/tests/test_pw_text_keys.c b/tests/test_pw_text_keys.c
+new file mode 100644
+index 0000000..06d82fe
+--- /dev/null
++++ b/tests/test_pw_text_keys.c
+@@ -0,0 +1,87 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "../src/pw_text_keys.h"
++#include <assert.h>
++#include <stdio.h>
++
++static void test_key(void)
++{
++    uint8_t vk;
++    int shift;
++
++    assert(pw_text_key('a', &vk, &shift) && vk == 'A' && !shift);
++    assert(pw_text_key('Z', &vk, &shift) && vk == 'Z' && shift);
++    assert(pw_text_key('7', &vk, &shift) && vk == '7' && !shift);
++    assert(pw_text_key(' ', &vk, &shift) && vk == 0x20 && !shift);
++    assert(pw_text_key('@', &vk, &shift) && vk == '2' && shift);
++    assert(pw_text_key(')', &vk, &shift) && vk == '0' && shift);
++    assert(pw_text_key('-', &vk, &shift) && vk == 0xbd && !shift);
++    assert(pw_text_key('_', &vk, &shift) && vk == 0xbd && shift);
++    assert(pw_text_key('=', &vk, &shift) && vk == 0xbb && !shift);
++    assert(pw_text_key('+', &vk, &shift) && vk == 0xbb && shift);
++    assert(pw_text_key('[', &vk, &shift) && vk == 0xdb && !shift);
++    assert(pw_text_key('}', &vk, &shift) && vk == 0xdd && shift);
++    assert(pw_text_key('\\', &vk, &shift) && vk == 0xdc && !shift);
++    assert(pw_text_key('|', &vk, &shift) && vk == 0xdc && shift);
++    assert(pw_text_key(';', &vk, &shift) && vk == 0xba && !shift);
++    assert(pw_text_key(':', &vk, &shift) && vk == 0xba && shift);
++    assert(pw_text_key('\'', &vk, &shift) && vk == 0xde && !shift);
++    assert(pw_text_key('"', &vk, &shift) && vk == 0xde && shift);
++    assert(pw_text_key(',', &vk, &shift) && vk == 0xbc && !shift);
++    assert(pw_text_key('<', &vk, &shift) && vk == 0xbc && shift);
++    assert(pw_text_key('.', &vk, &shift) && vk == 0xbe && !shift);
++    assert(pw_text_key('>', &vk, &shift) && vk == 0xbe && shift);
++    assert(pw_text_key('/', &vk, &shift) && vk == 0xbf && !shift);
++    assert(pw_text_key('?', &vk, &shift) && vk == 0xbf && shift);
++    assert(pw_text_key('`', &vk, &shift) && vk == 0xc0 && !shift);
++    assert(pw_text_key('~', &vk, &shift) && vk == 0xc0 && shift);
++    /* Every printable ASCII character has a key. */
++    for (uint32_t c = 0x20; c < 0x7f; c++) assert(pw_text_key(c, &vk, &shift));
++    /* No key: control characters, DEL, anything past ASCII. */
++    assert(!pw_text_key('\n', &vk, &shift) && !pw_text_key(0x7f, &vk, &shift));
++    assert(!pw_text_key(0xe7, &vk, &shift) && !pw_text_key(0x131, &vk, &shift));
++}
++
++static int is(const PwHidEvent *e, uint16_t code, int down)
++{
++    return e->kind == PW_HID_EVENT_KEY && e->code == code && e->down == down;
++}
++
++static void test_keys(void)
++{
++    static const uint16_t text[] = { 'a', 'B', '!' };
++    static const uint16_t foreign[] = { 0xe7, 'x', 0xd83d, 0xde00, 0xdc00, 'y' };   /* ç x 😀 lone-low y */
++    PwHidEvent e[32];
++    size_t skipped = 9, n;
++
++    n = pw_text_keys(text, 3, e, 32, &skipped);
++    assert(n == 10 && skipped == 0);
++    assert(is(&e[0], 'A', 1) && is(&e[1], 'A', 0));
++    assert(is(&e[2], 0x10, 1) && is(&e[3], 'B', 1) && is(&e[4], 'B', 0) && is(&e[5], 0x10, 0));
++    assert(is(&e[6], 0x10, 1) && is(&e[7], '1', 1) && is(&e[8], '1', 0) && is(&e[9], 0x10, 0));
++
++    /* Unmapped characters are counted, a surrogate pair as one. */
++    n = pw_text_keys(foreign, 6, e, 32, &skipped);
++    assert(n == 4 && skipped == 3);
++    assert(is(&e[0], 'X', 1) && is(&e[1], 'X', 0) && is(&e[2], 'Y', 1) && is(&e[3], 'Y', 0));
++
++    /* Only whole characters: 5 slots hold "a" and not the shifted "B". */
++    n = pw_text_keys(text, 3, e, 5, &skipped);
++    assert(n == 2);
++
++    /* The text ends at its first NUL; empty text and no buffer type nothing. */
++    {
++        static const uint16_t cut[] = { 'q', 0, 'w' };
++        n = pw_text_keys(cut, 3, e, 32, &skipped);
++        assert(n == 2 && is(&e[0], 'Q', 1));
++    }
++    assert(pw_text_keys(text, 0, e, 32, &skipped) == 0);
++    assert(pw_text_keys(text, 3, NULL, 32, NULL) == 0);
++}
++
++int main(void)
++{
++    test_key();
++    test_keys();
++    puts("test_pw_text_keys: ok");
++    return 0;
++}
+diff --git a/tools/build_native.sh b/tools/build_native.sh
+index 0906df9..f84a104 100755
+--- a/tools/build_native.sh
++++ b/tools/build_native.sh
+@@ -171,9 +171,11 @@ sources=(
+     native/pw_agc_submit_lifecycle.c native/pw_videoout_ps5.c native/pw_data_mount.c
+     native/pw_lapy_elevation.c
+     native/pw_wine_display.c native/pw_wine_library.c native/pw_hid_ps5.c native/pw_wine_prefix.c
++    native/pw_ime_ps5.c
+     src/pw_result.c src/pw_wine_start.c src/pw_wine_launch.c src/pw_game_profile.c src/pw_prefix_temp.c
+     src/pw_app_profile.c src/pw_profile_catalog.c src/pw_launcher_render.c src/pw_present.c
+     src/pw_pad.c src/pw_hid.c src/pw_spinner.c src/pw_script_input.c src/pw_tsc_calibrate.c
++    src/pw_text_keys.c src/pw_ime_chord.c
+     wine/ps5/pw_wine_prx.c
+ )
+ objects=()
+@@ -202,15 +204,22 @@ objects+=("$build/obj/ps5log.o" "$build/obj/ps5log_ps5_net.o")
+     -o "$build/obj/agc-driver-import.o"
+ "$sdk/bin/prospero-lld" --shared -soname libSceAgcDriver.prx \
+     -o "$build/import-stubs/libSceAgcDriver.so" "$build/obj/agc-driver-import.o"
++# The system keyboard's dialogs start from CommonDialog, which the SDK omits; the
++# store launcher names it the same way on hardware.
++"${cc[@]}" -std=c11 -O2 -fPIC -c "$root/native/stubs/libSceCommonDialog.c" \
++    -o "$build/obj/common-dialog-import.o"
++"$sdk/bin/prospero-lld" --shared -soname libSceCommonDialog.sprx \
++    -o "$build/import-stubs/libSceCommonDialog.so" "$build/obj/common-dialog-import.o"
+ 
+ "$sdk/bin/prospero-lld" -T "$layout" --eh-frame-hdr -e _start \
+     -o "$build/llvm-pie.elf" "$build/obj/app_crt.o" "${objects[@]}" \
+     --as-needed "$sdk"/target/lib/*.so "$build/import-stubs/libSceAgc.so" \
+-    "$build/import-stubs/libSceAgcDriver.so"
++    "$build/import-stubs/libSceAgcDriver.so" "$build/import-stubs/libSceCommonDialog.so"
+ "$tool" link --in "$build/llvm-pie.elf" --out "$build/eboot.elf" \
+     --stub-dir "$sdk/target/lib" --module-sdk 0x02000009 \
+     --stub "$build/import-stubs/libSceAgc.so" \
+     --stub "$build/import-stubs/libSceAgcDriver.so" \
++    --stub "$build/import-stubs/libSceCommonDialog.so" \
+     --companion-sdk 0x08050001 --file-name eboot.elf
+ "$tool" self --sign --in "$build/eboot.elf" --out "$dist/eboot.bin" \
+     --magic 0x1D3D154F
+-- 
+2.56.0
+
