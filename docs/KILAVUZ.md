@@ -68,6 +68,8 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
 ## Kontroller
 
 - Oyunda kumanda bir Xbox 360 kumandası gibi görünür.
+- **Tuş ipuçları** Xbox 360 kumandası yerine DualSense'in tuşlarını (✕ ○ □ △, L1/R1, L2/R2)
+  gösterir.
 - **Dokunmatik yüzey** fare imlecini hareket ettirir, basınca tıklar.
 - **Çıkmak için** Options tuşunu ve dokunmatik yüzeyi birlikte yaklaşık bir saniye basılı
   tutun.

@@ -99,10 +99,14 @@ int main()
     assert(load_plan(STORE_ASSETS "/plans/BLUR.json", blur, error));
     assert(blur.game == "BLUR" && blur.release == "1.2" && blur.prefix == "sahin" &&
            blur.profile.id == "pb-blur" && blur.profile.width == 3840 && blur.pending.empty() &&
-           blur.game_files.size() == 1 && blur.game_files[0].to == "dsound.dll" &&
+           blur.game_files.size() == 4 && blur.game_files[0].to == "dsound.dll" &&
            blur.options.size() == 2 && blur.option("online") && blur.upgrades.empty());
+    // The PlayStation button prompts: carried in the app's bundle, so their source has no url.
+    assert(blur.game_files[1].source == "playstation-prompts" &&
+           blur.game_files[1].to == "scripts/DS2TexInject.asi" && blur.game_files[3].to == "texmod/" &&
+           blur.source("playstation-prompts") && blur.source("playstation-prompts")->url.empty());
     // What earlier mod installs left behind is stripped from the copy.
-    assert(blur.strip.size() == 8 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
+    assert(blur.strip.size() == 11 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
     // Blur keeps its picture size in its own settings.xml once the player saves the Graphics
     // page; the plan keeps it to the page's Resolution.
     assert(blur.user_files.size() == 1 &&

@@ -19,10 +19,17 @@ def test_identity(tmp_path):
     assert p["profile"]["executable"] == "C:\\Games\\BLUR\\Blur.exe"
     assert "dsound=n,b" in p["profile"]["dll_overrides"]
 
+# Sources this repo makes (tools/build.sh), which the app carries in its bundle.
+MADE_HERE = {"playstation-prompts"}
+
 def test_every_source_pinned_and_downloadable(tmp_path):
     for sid, s in plan(tmp_path)["sources"].items():
         assert re.fullmatch(r"[0-9a-f]{64}", s["sha256"]), sid
-        assert s["size"] > 0 and s["url"].startswith("https://"), sid
+        assert s["size"] > 0, sid
+        if sid in MADE_HERE:
+            assert "url" not in s, sid
+        else:
+            assert s["url"].startswith("https://"), sid
 
 def test_placements_match_the_parser(tmp_path):
     p = plan(tmp_path)
@@ -69,3 +76,10 @@ def test_resolution_reaches_blurs_settings(tmp_path):
 def test_no_copyrighted_inline_content(tmp_path):
     text = json.dumps(plan(tmp_path))
     assert "blur_12" not in text and "speed.exe" not in text
+
+def test_playstation_prompts(tmp_path):
+    p = plan(tmp_path)
+    prompts = [g for g in p["game_files"] if g["source"] == "playstation-prompts"]
+    assert {g["to"] for g in prompts} == {"scripts/DS2TexInject.asi", "DS2TexInject.ini", "texmod/"}
+    assert all(g["source"] != "playstation-prompts" for o in p["options"] for g in o.get("game_files", []))
+    assert {"texmod", "DS2TexInject.ini"} <= set(p["strip"])

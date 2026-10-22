@@ -35,6 +35,14 @@ def dxvk_pin(script=ROOT / "tools/build-dxvk.sh"):
     return version.group(1), commit.group(1)
 
 
+def ds2texinject_pin(readme=ROOT / "third_party/ds2texinject/README.md"):
+    """The upstream commit third_party/ds2texinject was taken from."""
+    m = re.search(r"commit ([0-9a-f]{40})", readme.read_text())
+    if not m:
+        sys.exit(f"{readme}: no commit")
+    return m.group(1)
+
+
 def patch_count(project):
     return len(list((ROOT / "patches" / project).rglob("*.patch")))
 
@@ -61,6 +69,9 @@ def sources(old, rev, version, tid):
         f"DXVK {dxvk_version} (d3d8, d3d9, d3d10core, d3d11, dxgi in assets/bundle/bare-prefix-sahin.zip)",
         f"  https://github.com/doitsujin/dxvk  commit {dxvk_commit} (v3.1.1)",
         f"  with patches/dxvk ({patch_count('dxvk')} patches) from the Sahin repository",
+        "DS2TexInject (scripts/DS2TexInject.asi in the PlayStation button prompts' zip in assets/bundle)",
+        f"  https://github.com/sidnei-almeida/dead-space-2-texmod-linux  commit {ds2texinject_pin()}",
+        "  unchanged, in third_party/ds2texinject of the Sahin repository",
         "ps5-opengl (linked into eboot.bin)  https://github.com/mpereiraesaa/ps5-opengl",
         f"  the submodule commit the Sahin repository pins at commit {rev}",
         "",
@@ -128,6 +139,15 @@ LGPL-2.1-or-later, below) and our build of [DXVK](https://github.com/doitsujin/d
 with the licences of what its DLLs build in (`LICENSES/dxvk/`: dxbc-spirv,
 libdisplay-info, the Vulkan and SPIR-V headers). `SOURCES.txt` names the DXVK
 commit and the patches applied.
+
+## The PlayStation button prompts: `assets/bundle/` (the zip with `DS2TexInject.asi`)
+
+Installed when the page's PlayStation button prompts option is on:
+[DS2TexInject](https://github.com/sidnei-almeida/dead-space-2-texmod-linux)
+(`scripts/DS2TexInject.asi`), MIT (`LICENSES/ds2texinject/LICENSE`), built from
+the source `SOURCES.txt` names; its settings, `DS2TexInject.ini`; and the
+button atlas it swaps in (`texmod/_cache/0xF6FA7B91.dds`), Sahin's own, drawn by
+`art/make-prompts.py`, GPL-3.0-or-later. Nothing comes from the game.
 
 ## The art: `sce_sys/`
 

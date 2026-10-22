@@ -16,7 +16,10 @@
 #             tools/build-prospero-win.sh's steps
 #   plan      profile/blur/make-blur-plan.py; fails if the committed
 #             launcher/assets/plans/BLUR.json differs from what it writes
-#   bundle    tools/make-bundle.py: the bare prefix into the launcher's assets/bundle
+#   prompts   tools/build-prompts.sh: Blur's PlayStation button prompts (the texture plugin
+#             from third_party/ds2texinject, our atlas) -> release/playstation-prompts.zip
+#   bundle    tools/make-bundle.py: the bare prefix and the prompts into the launcher's
+#             assets/bundle
 #   opengl-sdk  tools/build-opengl-sdk.sh: the launcher's ps5-opengl SDK, from the ps5-opengl
 #             submodule -> release/ps5-opengl-sdk-<version>.tar.gz (its release download
 #             is gone; launcher/tools/fetch-opengl-sdk.sh pins this build's hashes)
@@ -29,7 +32,7 @@ set -euo pipefail
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 image=sahin-build volume=${SAHIN_VOLUME:-sahin-work}
 pw_steps="setup title radv zink hostwine wineps5 cpu pkg apps dxvk prefix"
-all="$pw_steps plan bundle opengl-sdk game-app audit"
+all="$pw_steps plan prompts bundle opengl-sdk game-app audit"
 clean=0
 [[ ${1:-} == --clean ]] && { clean=1; shift; }
 steps=" ${*:-$all} "
@@ -86,6 +89,10 @@ if want plan; then
     git diff --exit-code -- launcher/assets/plans/BLUR.json ||
         { echo 'make-blur-plan.py writes another plan than the committed launcher/assets/plans/BLUR.json' >&2; exit 1; }
 fi
+if want prompts; then
+    echo '==> prompts'
+    tools/build-prompts.sh
+fi
 if want bundle; then
     echo '==> bundle'
     python3 tools/make-bundle.py --launcher \$L
@@ -130,6 +137,9 @@ if want game-app; then
     cp \$x/include/vulkan/LICENSE.md \$A/LICENSES/dxvk/vulkan/
     cp \$x/include/spirv/LICENSE \$A/LICENSES/dxvk/spirv/
     # The libraries in the launcher's own source tree (its network ones are in assets/licenses).
+    # The texture plugin in the PlayStation button prompts' zip (the prompts step).
+    mkdir -p \$A/LICENSES/ds2texinject
+    cp third_party/ds2texinject/LICENSE \$A/LICENSES/ds2texinject/
     mkdir -p \$A/LICENSES/launcher
     cp \$L/THIRD_PARTY_NOTICES.md \$A/LICENSES/launcher/
     for t in miniz/LICENSE monocypher/LICENCE.md picosha2/LICENSE stb/LICENSE yyjson/LICENSE; do
@@ -152,7 +162,7 @@ if want audit; then
 fi
 
 # The outputs, and their hashes.
-out='PPSA99995 apps PPSA99404 PPSA99404.zip bare-prefix-sahin.zip '\$(cd release && ls ps5-opengl-sdk-*.tar.gz 2>/dev/null || true)
+out='PPSA99995 apps PPSA99404 PPSA99404.zip bare-prefix-sahin.zip playstation-prompts.zip '\$(cd release && ls ps5-opengl-sdk-*.tar.gz 2>/dev/null || true)
 # Only what the volume has replaces release/: an output it lacks (a partial run on a fresh
 # volume) is left as it was, and hashed with the rest.
 for o in \$out; do [[ ! -e release/\$o ]] || { rm -rf /out/\$o; cp -a release/\$o /out/; }; done

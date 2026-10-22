@@ -22,3 +22,6 @@ assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d9.dll
 assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d10core.dll
 assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/d3d11.dll
 assets/bundle/bare-prefix-sahin.zip!drive_c/windows/syswow64/dxgi.dll
+# The PlayStation button prompts the bundle carries (tools/build-prompts.sh): the texture
+# plugin, built from third_party/ds2texinject.
+assets/bundle/*.zip!scripts/DS2TexInject.asi
