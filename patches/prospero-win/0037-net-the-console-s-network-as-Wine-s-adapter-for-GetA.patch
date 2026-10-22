@@ -1,0 +1,536 @@
+From 1ce236b07adc966b62611583c0afaba1aad6fee6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
+ <20913374+7tg@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 18:13:21 +0300
+Subject: [PATCH] net: the console's network as Wine's adapter, for
+ GetAdaptersInfo
+
+A title cannot start winedevice, so nsiproxy.sys never answers and every
+NSI table fails: GetAdaptersInfo found no adapter. Blur's Demonware
+client asks it before logging in and said the server was unavailable
+without connecting (Amax, on the console; the same copy logs in on a PC).
+
+The title reads the console's network with sceNetCtlGetInfo (Ethernet
+address, IP address, netmask, default route; native/pw_net_ps5.c) and
+passes it to Wine as WINE_PS5_ADAPTER=ip,netmask,gateway,mac
+(src/pw_net_adapter.c checks each address, so only those characters reach
+the environment). Wine patch 0480: when the NDIS table fails,
+GetAdaptersInfo reports that one Ethernet adapter; without the variable,
+as anywhere but in a title, nothing changes. iphlpapi joins PE_MODULES so
+the patched DLL replaces the host build's. The log has a
+"PW_WINE64 net adapter" line with each call's result.
+---
+ Makefile                                      |   3 +-
+ PUBLICATION_ALLOWLIST.txt                     |   6 +
+ docs/WINE_PS5_BUILD.md                        |  17 +++
+ native/pw_net_ps5.c                           |  49 ++++++++
+ native/pw_net_ps5.h                           |  15 +++
+ native/wine64_main.c                          |  17 ++-
+ src/pw_net_adapter.c                          |  46 +++++++
+ src/pw_net_adapter.h                          |  24 ++++
+ tests/test_pw_net_adapter.c                   |  40 ++++++
+ tools/build_native.sh                         |   4 +-
+ tools/build_wine_ps5.sh                       |   3 +-
+ ...0-iphlpapi-ps5-title-network-adapter.patch | 119 ++++++++++++++++++
+ 12 files changed, 337 insertions(+), 6 deletions(-)
+ create mode 100644 native/pw_net_ps5.c
+ create mode 100644 native/pw_net_ps5.h
+ create mode 100644 src/pw_net_adapter.c
+ create mode 100644 src/pw_net_adapter.h
+ create mode 100644 tests/test_pw_net_adapter.c
+ create mode 100644 wine/patches/0480-iphlpapi-ps5-title-network-adapter.patch
+
+diff --git a/Makefile b/Makefile
+index b72de8f..92dcbfb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -71,6 +71,7 @@ $(eval $(call test_rule,test_vk_wire,tests/test_vk_wire.c wine/ps5/pw_vk_wire.c
+ $(eval $(call test_rule,test_pw_wine_library,tests/test_pw_wine_library.c native/pw_wine_library.c src/pw_game_profile.c src/pw_app_profile.c src/pw_profile_catalog.c,-D_DEFAULT_SOURCE))
+ $(eval $(call test_rule,test_pw_hid,tests/test_pw_hid.c src/pw_hid.c,))
+ $(eval $(call test_rule,test_pw_text_keys,tests/test_pw_text_keys.c src/pw_text_keys.c,))
++$(eval $(call test_rule,test_pw_net_adapter,tests/test_pw_net_adapter.c src/pw_net_adapter.c,))
+ $(eval $(call test_rule,test_pw_ime_chord,tests/test_pw_ime_chord.c src/pw_ime_chord.c,))
+ $(eval $(call test_rule,test_pw_spinner,tests/test_pw_spinner.c src/pw_spinner.c,))
+ $(eval $(call test_rule,test_pw_hid_ps5,tests/test_pw_hid_ps5.c native/pw_hid_ps5.c src/pw_hid.c,-DPW_HID_PS5_HOST_TEST))
+@@ -146,7 +147,7 @@ $(eval $(call test_rule,test_pw_key_shared,tests/test_pw_key_shared.c,))
+ 
+ TESTS := test_pw_qpc_clock test_pw_key_shared test_pw_diagnostics test_pw_x86_hostexec test_pw_app_profile test_pw_profile_catalog test_pw_present \
+ 	test_pw_wine_heap test_pw_wine_dmem test_pw_wine_dmem_ps5 test_pw_wine_prx test_pw_wine_start test_pw_wine_launch test_pw_script_input test_pw_game_profile test_pw_prefix_temp test_pw_tsc_calibrate test_pw_wine_prefix_cpu test_vk_command_stream test_vk_spsc test_vk_replay test_vk_wire test_vk_codec \
+-	test_pw_wine_library test_pw_wine_display test_pw_hid test_pw_hid_ps5 test_pw_text_keys test_pw_ime_chord test_pw_spinner test_pw_wine_dl test_pw_wine_sink \
++	test_pw_wine_library test_pw_wine_display test_pw_hid test_pw_hid_ps5 test_pw_text_keys test_pw_ime_chord test_pw_net_adapter test_pw_spinner test_pw_wine_dl test_pw_wine_sink \
+ 	test_pw_wine_threads test_pw_wine_compat test_pw_wine_cwd test_pw_wine_cwd_listing test_pw_ws2_32_libc test_pw_launcher_render test_pw_pad \
+ 	test_pw_guest_fp test_pw_vm test_pw_x86_block test_pw_x86_flat test_pw_x86_cache test_pw_x86_code_pages test_pw_wow_smc_pages test_pw_wow_thread_budget test_pw_wow_tsc_clock test_pw_wow_call_top \
+ 	test_pw_x86_engine test_pw_x86_chaining test_pw_x86_residency test_pw_x86_global_residency test_pw_x86_reencode test_pw_x86_smc test_pw_x86_fault_markers test_pw_x86_lazyflags \
+diff --git a/PUBLICATION_ALLOWLIST.txt b/PUBLICATION_ALLOWLIST.txt
+index 18e3364..deeb865 100644
+--- a/PUBLICATION_ALLOWLIST.txt
++++ b/PUBLICATION_ALLOWLIST.txt
+@@ -211,6 +211,7 @@ wine/patches/0456-win32u-vulkan-keep-swapchain-chain-when-scaling.patch
+ wine/patches/0457-win32u-vulkan-placed-map-properties-khr.patch
+ wine/patches/0460-win32u-ps5-driver-vulkan-display-plane.patch
+ wine/patches/0470-xinput-ps5-title-controller.patch
++wine/patches/0480-iphlpapi-ps5-title-network-adapter.patch
+ wine/patches/0471-xinput-ps5-four-controllers.patch
+ wine/patches/0560-ntdll-stderr-output-sink.patch
+ wine/patches/0570-ntdll-ps5-reserve-virtual-range.patch
+@@ -314,6 +315,11 @@ src/pw_ime_chord.h
+ tests/test_pw_ime_chord.c
+ native/pw_ime_ps5.c
+ native/pw_ime_ps5.h
++src/pw_net_adapter.c
++src/pw_net_adapter.h
++tests/test_pw_net_adapter.c
++native/pw_net_ps5.c
++native/pw_net_ps5.h
+ native/pw_data_mount.h
+ tests/test_pw_data_mount.c
+ tests/test_pw_data_mount_native.c
+diff --git a/docs/WINE_PS5_BUILD.md b/docs/WINE_PS5_BUILD.md
+index ff6ac8d..718a896 100644
+--- a/docs/WINE_PS5_BUILD.md
++++ b/docs/WINE_PS5_BUILD.md
+@@ -575,6 +575,23 @@ To use it on the console:
+ - give the game's profile `[input] mode = xinput` (see
+   [Starting Wine in the title](#starting-wine-in-the-title)).
+ 
++## Network adapter
++
++Games ask `GetAdaptersInfo` for the machine's adapters, and some look for one
++before going online (Blur's Demonware client says the server is unavailable
++without connecting). Wine answers through NSI, served by `nsiproxy.sys` in
++`winedevice.exe`, which a title cannot start, so every NSI table fails and
++no adapter is found. Patch 0480 gives `GetAdaptersInfo` one:
++
++- The title reads the console's network with `sceNetCtlGetInfo` (Ethernet
++  address, IP address, netmask, default route; `native/pw_net_ps5.c`) and
++  sets `WINE_PS5_ADAPTER=ip,netmask,gateway,mac`, the MAC as 12 hex digits
++  (`src/pw_net_adapter.c`). The game log has a `PW_WINE64 net adapter` line.
++- When the NDIS table fails, `GetAdaptersInfo` reports that one Ethernet
++  adapter. Without the variable, as anywhere but in a title, the NSI error
++  is returned as before.
++- iphlpapi is in `PE_MODULES`, so the patched DLL replaces the host build's.
++
+ ## WoW64 CPU backend
+ 
+ The PRX stage also links `wowprospero.prx`, the Unix side of the WoW64 CPU
+diff --git a/native/pw_net_ps5.c b/native/pw_net_ps5.c
+new file mode 100644
+index 0000000..e1794ce
+--- /dev/null
++++ b/native/pw_net_ps5.c
+@@ -0,0 +1,49 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "pw_net_ps5.h"
++#include "../src/pw_net_adapter.h"
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++int sceNetCtlInit(void);
++int sceNetCtlGetInfo(int code, void *info);
++
++enum { INFO_ETHER_ADDR = 2, INFO_IP_ADDRESS = 14, INFO_NETMASK = 15, INFO_DEFAULT_ROUTE = 16,
++       INFO_BYTES = 512 /* the union is 256 bytes; room to spare */ };
++
++/* One string field; empty when the call fails. */
++static int text(int code, char out[16])
++{
++    union { char text[INFO_BYTES]; uint64_t align; } info;
++    int status;
++
++    memset(&info, 0, sizeof(info));
++    status = sceNetCtlGetInfo(code, &info);
++    memcpy(out, info.text, 15);
++    out[15] = 0;
++    if (status < 0) out[0] = 0;
++    return status;
++}
++
++int pw_net_ps5_adapter(char *out, size_t size, void (*log)(const char *line))
++{
++    union { uint8_t bytes[INFO_BYTES]; uint64_t align; } ether;
++    char ip[16], netmask[16], gateway[16], line[160];
++    int init, ether_status, ip_status, mask_status, route_status, status;
++
++    if (!out || !size) return PW_ERR_PRECONDITION;
++    out[0] = 0;
++    init = sceNetCtlInit();   /* already initialised is an error code; the reads tell */
++    memset(&ether, 0, sizeof(ether));
++    ether_status = sceNetCtlGetInfo(INFO_ETHER_ADDR, &ether);
++    ip_status = text(INFO_IP_ADDRESS, ip);
++    mask_status = text(INFO_NETMASK, netmask);
++    route_status = text(INFO_DEFAULT_ROUTE, gateway);
++    status = ether_status < 0 ? PW_ERR_NOT_FOUND :
++             pw_net_adapter_value(ip, netmask, gateway, ether.bytes, out, size);
++    snprintf(line, sizeof(line), "adapter init=%#x ether=%#x ip=%#x netmask=%#x route=%#x value=%s status=%d",
++             (unsigned)init, (unsigned)ether_status, (unsigned)ip_status, (unsigned)mask_status,
++             (unsigned)route_status, status == PW_OK ? out : "-", status);
++    if (log) log(line);
++    return status;
++}
+diff --git a/native/pw_net_ps5.h b/native/pw_net_ps5.h
+new file mode 100644
+index 0000000..05531f1
+--- /dev/null
++++ b/native/pw_net_ps5.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef PW_NET_PS5_H
++#define PW_NET_PS5_H
++/*
++ * The console's network for Wine's adapter (src/pw_net_adapter.h), read
++ * with libSceNetCtl: sceNetCtlGetInfo's codes and its info union are the
++ * ones public PS4/PS5 reimplementations agree on (OpenOrbis, shadPS4):
++ * 2 the Ethernet address (6 bytes), 14 the IP address, 15 the netmask,
++ * 16 the default route, each address a NUL-terminated string of 16 bytes.
++ */
++#include <stddef.h>
++
++/* WINE_PS5_ADAPTER's value into out; PW_OK, or the failure (logged). */
++int pw_net_ps5_adapter(char *out, size_t size, void (*log)(const char *line));
++#endif
+diff --git a/native/wine64_main.c b/native/wine64_main.c
+index f4bc3ab..14c6371 100644
+--- a/native/wine64_main.c
++++ b/native/wine64_main.c
+@@ -36,6 +36,7 @@
+ #include "pw_pad_ps5.h"
+ #include "pw_hid_ps5.h"
+ #include "pw_ime_ps5.h"
++#include "pw_net_ps5.h"
+ #include "pw_videoout_ps5.h"
+ #include "pw_wine_library.h"
+ #include "pw_wine_prefix.h"
+@@ -44,6 +45,7 @@
+ #include "../src/pw_tsc_calibrate.h"
+ #include "../src/pw_ime_chord.h"
+ #include "../src/pw_text_keys.h"
++#include "../src/pw_net_adapter.h"
+ #include "pw_wine_display.h"
+ #include "../include/prospero_win.h"
+ 
+@@ -759,6 +761,12 @@ static void hid_log(const char *line)
+     PS5LOG_LOG("PW_WINE64 hid %s", line);
+ }
+ 
++/* The console's network, for Wine's adapter. */
++static void net_log(const char *line)
++{
++    PS5LOG_LOG("PW_WINE64 net %s", line);
++}
++
+ /* The process's CPU time, user and system, in milliseconds: a stall that
+  * waits shows no growth, one that spins grows by a core a second. */
+ static unsigned long long cpu_ms(void)
+@@ -965,9 +973,9 @@ static int start_thread(void (*entry)(void *), void *arg, size_t stack_bytes)
+ int main(int argc, char **argv)
+ {
+     static char prefix[PW_WINE_LIBRARY_PATH + PW_APP_ID_CAPACITY], desktop[24], view[8] = "window";
+-    static char radv_cache[PW_WINE_LIBRARY_PATH + 16];
++    static char radv_cache[PW_WINE_LIBRARY_PATH + 16], adapter[PW_NET_ADAPTER_VALUE];
+     enum { WINE64_FIXED_ENV_COUNT = 7,
+-           WINE64_PROFILE_ENV_CAPACITY = 3 + PW_GAME_GRAPHICS_ENV_MAX + PW_GAME_RUNTIME_ENV_MAX + PW_GAME_CPU_ENV_MAX +
++           WINE64_PROFILE_ENV_CAPACITY = 4 + PW_GAME_GRAPHICS_ENV_MAX + PW_GAME_RUNTIME_ENV_MAX + PW_GAME_CPU_ENV_MAX +
+                                          PW_GAME_CLOCK_ENV_MAX + PW_GAME_DEBUG_ENV_MAX };
+     static PwWineStartEnv extra[WINE64_FIXED_ENV_COUNT + WINE64_PROFILE_ENV_CAPACITY] = {
+         { "WINEDEBUG", PW_WINE64_DEBUG },
+@@ -1086,6 +1094,11 @@ int main(int argc, char **argv)
+                      (unsigned)game->display.height);
+             extra[config.extra_env_count++] = (PwWineStartEnv){ "WINE_PS5_DESKTOP", desktop };
+         }
++        /* The console's network as Wine's one adapter (Wine patch 0480):
++         * nsiproxy.sys never runs in a title, and games that look for an
++         * adapter before going online (Blur) found none. */
++        if (pw_net_ps5_adapter(adapter, sizeof(adapter), net_log) == PW_OK)
++            extra[config.extra_env_count++] = (PwWineStartEnv){ "WINE_PS5_ADAPTER", adapter };
+         /* OpenGL selects the native Zink provider; preserve other per-game
+          * overrides such as DXVK when composing it. */
+         int overrides_status = pw_app_profile_effective_dll_overrides(
+diff --git a/src/pw_net_adapter.c b/src/pw_net_adapter.c
+new file mode 100644
+index 0000000..3b67783
+--- /dev/null
++++ b/src/pw_net_adapter.c
+@@ -0,0 +1,46 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "pw_net_adapter.h"
++#include <stdio.h>
++#include <string.h>
++
++/* A dotted IPv4 address: four decimal parts of 0..255 without leading
++ * zeros. Its value goes to *value. */
++static int ipv4(const char *text, uint32_t *value)
++{
++    uint32_t address = 0;
++
++    for (int part = 0; part < 4; part++) {
++        unsigned number = 0, digits = 0;
++
++        while (*text >= '0' && *text <= '9') {
++            if (digits && !number) return 0;              /* a leading zero */
++            number = number * 10 + (unsigned)(*text++ - '0');
++            if (++digits > 3 || number > 255) return 0;
++        }
++        if (!digits) return 0;
++        address = address << 8 | number;
++        if (part < 3 && *text++ != '.') return 0;
++    }
++    if (*text) return 0;
++    *value = address;
++    return 1;
++}
++
++int pw_net_adapter_value(const char *ip, const char *netmask, const char *gateway, const uint8_t mac[6],
++                         char *out, size_t size)
++{
++    uint32_t value;
++    int written;
++
++    if (!ip || !netmask || !gateway || !mac || !out || !size) return PW_ERR_PRECONDITION;
++    if (!*gateway) gateway = "0.0.0.0";
++    if (!ipv4(ip, &value) || !value || !ipv4(netmask, &value) || !ipv4(gateway, &value))
++        return PW_ERR_MALFORMED;
++    written = snprintf(out, size, "%s,%s,%s,%02x%02x%02x%02x%02x%02x", ip, netmask, gateway, mac[0], mac[1],
++                       mac[2], mac[3], mac[4], mac[5]);
++    if (written < 0 || (size_t)written >= size) {
++        out[0] = 0;
++        return PW_ERR_PRECONDITION;
++    }
++    return PW_OK;
++}
+diff --git a/src/pw_net_adapter.h b/src/pw_net_adapter.h
+new file mode 100644
+index 0000000..d4a630e
+--- /dev/null
++++ b/src/pw_net_adapter.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef PW_NET_ADAPTER_H
++#define PW_NET_ADAPTER_H
++/*
++ * The console's network as Wine's one adapter. A title cannot start
++ * winedevice, so nsiproxy.sys never answers and Wine's GetAdaptersInfo
++ * found no adapter; games that look for one before going online gave up
++ * (Blur's Demonware client). The title reads the console's network and
++ * sets WINE_PS5_ADAPTER = "ip,netmask,gateway,mac", the MAC as 12 hex
++ * digits, which GetAdaptersInfo reports (Wine patch 0480).
++ */
++#include "../include/prospero_win.h"
++#include <stddef.h>
++#include <stdint.h>
++
++enum { PW_NET_ADAPTER_VALUE = 3 * 16 + 12 + 1 };   /* three addresses, the MAC, NUL */
++
++/* The variable's value. Each address is a dotted IPv4 address (no leading
++ * zeros); the address may not be 0.0.0.0, and an empty gateway (no default
++ * route) is 0.0.0.0. PW_ERR_MALFORMED for anything else, so only these
++ * characters reach Wine's environment. */
++int pw_net_adapter_value(const char *ip, const char *netmask, const char *gateway, const uint8_t mac[6],
++                         char *out, size_t size);
++#endif
+diff --git a/tests/test_pw_net_adapter.c b/tests/test_pw_net_adapter.c
+new file mode 100644
+index 0000000..3db7b0f
+--- /dev/null
++++ b/tests/test_pw_net_adapter.c
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "../src/pw_net_adapter.h"
++#include <assert.h>
++#include <stdio.h>
++#include <string.h>
++
++static void test_value(void)
++{
++    static const uint8_t mac[6] = { 0x50, 0xb0, 0x3b, 0xf7, 0xe3, 0xa2 };
++    char out[PW_NET_ADAPTER_VALUE];
++
++    assert(pw_net_adapter_value("192.168.31.16", "255.255.255.0", "192.168.31.1", mac, out, sizeof(out)) == PW_OK);
++    assert(!strcmp(out, "192.168.31.16,255.255.255.0,192.168.31.1,50b03bf7e3a2"));
++
++    /* No default route: no gateway, the rest still reported. */
++    assert(pw_net_adapter_value("10.0.0.5", "255.0.0.0", "", mac, out, sizeof(out)) == PW_OK);
++    assert(!strcmp(out, "10.0.0.5,255.0.0.0,0.0.0.0,50b03bf7e3a2"));
++
++    /* Only dotted IPv4 addresses reach Wine's environment. */
++    assert(pw_net_adapter_value("", "255.255.255.0", "192.168.31.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("0.0.0.0", "255.255.255.0", "192.168.31.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("192.168.31", "255.255.255.0", "1.1.1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("192.168.31.256", "255.255.255.0", "1.1.1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("192.168.31.1,x", "255.255.255.0", "1.1.1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("1.2.3.4", "255.255.255.0.0", "1.1.1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("1.2.3.4", "255.255.255.0", "1..1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++    assert(pw_net_adapter_value("01.2.3.4", "255.255.255.0", "1.1.1.1", mac, out, sizeof(out)) == PW_ERR_MALFORMED);
++
++    /* A buffer too small, or missing arguments. */
++    assert(pw_net_adapter_value("192.168.31.16", "255.255.255.0", "192.168.31.1", mac, out, 20) == PW_ERR_PRECONDITION);
++    assert(pw_net_adapter_value(NULL, "255.255.255.0", "192.168.31.1", mac, out, sizeof(out)) == PW_ERR_PRECONDITION);
++    assert(pw_net_adapter_value("1.2.3.4", "255.255.255.0", "1.1.1.1", NULL, out, sizeof(out)) == PW_ERR_PRECONDITION);
++}
++
++int main(void)
++{
++    test_value();
++    puts("test_pw_net_adapter: ok");
++    return 0;
++}
+diff --git a/tools/build_native.sh b/tools/build_native.sh
+index f84a104..adfe539 100755
+--- a/tools/build_native.sh
++++ b/tools/build_native.sh
+@@ -171,11 +171,11 @@ sources=(
+     native/pw_agc_submit_lifecycle.c native/pw_videoout_ps5.c native/pw_data_mount.c
+     native/pw_lapy_elevation.c
+     native/pw_wine_display.c native/pw_wine_library.c native/pw_hid_ps5.c native/pw_wine_prefix.c
+-    native/pw_ime_ps5.c
++    native/pw_ime_ps5.c native/pw_net_ps5.c
+     src/pw_result.c src/pw_wine_start.c src/pw_wine_launch.c src/pw_game_profile.c src/pw_prefix_temp.c
+     src/pw_app_profile.c src/pw_profile_catalog.c src/pw_launcher_render.c src/pw_present.c
+     src/pw_pad.c src/pw_hid.c src/pw_spinner.c src/pw_script_input.c src/pw_tsc_calibrate.c
+-    src/pw_text_keys.c src/pw_ime_chord.c
++    src/pw_text_keys.c src/pw_ime_chord.c src/pw_net_adapter.c
+     wine/ps5/pw_wine_prx.c
+ )
+ objects=()
+diff --git a/tools/build_wine_ps5.sh b/tools/build_wine_ps5.sh
+index 1f553be..2b2b320 100755
+--- a/tools/build_wine_ps5.sh
++++ b/tools/build_wine_ps5.sh
+@@ -92,7 +92,8 @@ TARGETS="dlls/ntdll/ntdll.so dlls/win32u/win32u.so server/wineserver dlls/winevu
+ # xinput1_4. quartz: its renderers wait for a state change without the filter
+ # lock (patch 0700). winevulkan: emit its PE thunks alongside the Unix side so command-stream
+ # hooks and dispatch table capability checks come from the same source.
+-PE_MODULES="ntdll win32u xinput1_1 xinput1_2 xinput1_3 xinput1_4 xinputuap quartz winevulkan"
++# iphlpapi: GetAdaptersInfo reports the title's network adapter (patch 0480).
++PE_MODULES="ntdll win32u xinput1_1 xinput1_2 xinput1_3 xinput1_4 xinputuap quartz winevulkan iphlpapi"
+ # Everything optional but FreeType (built below) is off: the console has none
+ # of these libraries, and a configure-time probe against the payload SDK must
+ # not pick up host headers.
+diff --git a/wine/patches/0480-iphlpapi-ps5-title-network-adapter.patch b/wine/patches/0480-iphlpapi-ps5-title-network-adapter.patch
+new file mode 100644
+index 0000000..735c9a9
+--- /dev/null
++++ b/wine/patches/0480-iphlpapi-ps5-title-network-adapter.patch
+@@ -0,0 +1,119 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: prospero-win <prospero-win@invalid>
++Date: Thu, 22 Oct 2026 12:00:00 +0300
++Subject: [PATCH] iphlpapi: Report the PS5 title's network adapter.
++
++A PS5 title runs Wine in its own process and cannot start winedevice, so
++nsiproxy.sys never answers and every NSI table fails. GetAdaptersInfo
++then reported no adapter, and games that look for one before going
++online (Blur's Demonware client) said the server was unavailable without
++connecting.
++
++When the NDIS table fails, GetAdaptersInfo now reads WINE_PS5_ADAPTER,
++which the title sets from the console's network (sceNetCtlGetInfo) as
++"ip,netmask,gateway,mac" with the MAC as 12 hex digits, and reports that
++one Ethernet adapter. Without the variable, as anywhere but in a title,
++the NSI error is returned as before.
++---
++ dlls/iphlpapi/iphlpapi_main.c |   79 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
++ 1 file changed, 78 insertions(+), 1 deletion(-)
++
++diff --git a/dlls/iphlpapi/iphlpapi_main.c b/dlls/iphlpapi/iphlpapi_main.c
++index b315490..78a9880 100644
++--- a/dlls/iphlpapi/iphlpapi_main.c
+++++ b/dlls/iphlpapi/iphlpapi_main.c
++@@ -585,6 +585,79 @@ static void ip_addr_string_init( IP_ADDR_STRING *s, const IN_ADDR *addr, const I
++     s->Context = ctxt;
++ }
++ 
+++/* A PS5 title cannot start winedevice, so nsiproxy.sys never answers and
+++ * every NSI table fails. The title reads the console's network
+++ * (sceNetCtlGetInfo) and passes it as WINE_PS5_ADAPTER =
+++ * "ip,netmask,gateway,mac", the MAC as 12 hex digits; GetAdaptersInfo
+++ * then reports that one Ethernet adapter. Without the variable, as
+++ * anywhere but in a title, nothing changes. */
+++static BOOL ps5_adapter( IN_ADDR *addr, IN_ADDR *mask, IN_ADDR *gateway, BYTE mac[6] )
+++{
+++    char value[96], *field[4], *cursor = value;
+++    const char *end;
+++    DWORD len, i;
+++
+++    len = GetEnvironmentVariableA( "WINE_PS5_ADAPTER", value, sizeof(value) );
+++    if (!len || len >= sizeof(value)) return FALSE;
+++    for (i = 0; i < 4; i++)
+++    {
+++        field[i] = cursor;
+++        cursor = strchr( cursor, ',' );
+++        if (i < 3)
+++        {
+++            if (!cursor) return FALSE;
+++            *cursor++ = 0;
+++        }
+++        else if (cursor) return FALSE;
+++    }
+++    if (RtlIpv4StringToAddressA( field[0], TRUE, &end, addr ) || *end) return FALSE;
+++    if (RtlIpv4StringToAddressA( field[1], TRUE, &end, mask ) || *end) return FALSE;
+++    if (RtlIpv4StringToAddressA( field[2], TRUE, &end, gateway ) || *end) return FALSE;
+++    if (strlen( field[3] ) != 12) return FALSE;
+++    for (i = 0; i < 12; i++)
+++    {
+++        char c = field[3][i];
+++        BYTE digit;
+++
+++        if (c >= '0' && c <= '9') digit = c - '0';
+++        else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+++        else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+++        else return FALSE;
+++        mac[i / 2] = i % 2 ? (mac[i / 2] << 4) | digit : digit;
+++    }
+++    return TRUE;
+++}
+++
+++static DWORD ps5_adapters_info( IP_ADAPTER_INFO *info, ULONG *size )
+++{
+++    static const GUID guid = { 0x5053352d, 0x6e65, 0x7400, { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 } };
+++    IN_ADDR addr, mask, gateway, none;
+++    BYTE mac[6];
+++
+++    if (!ps5_adapter( &addr, &mask, &gateway, mac )) return ERROR_NO_DATA;
+++    if (!info || *size < sizeof(*info))
+++    {
+++        *size = sizeof(*info);
+++        return ERROR_BUFFER_OVERFLOW;
+++    }
+++    memset( info, 0, sizeof(*info) );
+++    ConvertGuidToStringA( &guid, info->AdapterName, sizeof(info->AdapterName) );
+++    strcpy( info->Description, "PS5 network" );
+++    info->AddressLength = sizeof(mac);
+++    memcpy( info->Address, mac, sizeof(mac) );
+++    info->Index = 1;
+++    info->Type = MIB_IF_TYPE_ETHERNET;
+++    info->DhcpEnabled = TRUE;
+++    ip_addr_string_init( &info->IpAddressList, &addr, &mask, 0 );
+++    none.s_addr = INADDR_NONE;
+++    ip_addr_string_init( &info->GatewayList, &gateway, &none, 0 );
+++    ip_addr_string_init( &info->DhcpServer, NULL, NULL, 0 );
+++    ip_addr_string_init( &info->PrimaryWinsServer, NULL, NULL, 0 );
+++    ip_addr_string_init( &info->SecondaryWinsServer, NULL, NULL, 0 );
+++    TRACE( "PS5 adapter %s\n", info->IpAddressList.IpAddress.String );
+++    return ERROR_SUCCESS;
+++}
+++
++ /******************************************************************
++  *    GetAdaptersInfo (IPHLPAPI.@)
++  *
++@@ -615,7 +688,11 @@ DWORD WINAPI GetAdaptersInfo( IP_ADAPTER_INFO *info, ULONG *size )
++                                   (void **)&if_keys, sizeof(*if_keys), (void **)&if_rw, sizeof(*if_rw),
++                                   NULL, 0, (void **)&if_stat, sizeof(*if_stat), &if_count, 0 );
++ 
++-    if (err) return err;
+++    if (err)
+++    {
+++        DWORD ps5 = ps5_adapters_info( info, size );
+++        return ps5 == ERROR_NO_DATA ? err : ps5;
+++    }
++     for (i = 0; i < if_count; i++)
++     {
++         if (if_stat[i].type == IF_TYPE_SOFTWARE_LOOPBACK) continue;
++-- 
++2.47.0
+-- 
+2.56.0
+

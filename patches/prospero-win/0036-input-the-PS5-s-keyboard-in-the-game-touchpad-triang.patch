@@ -1,4 +1,4 @@
-From 678407c49c0bba72cb92399315ebfd2d130549cb Mon Sep 17 00:00:00 2001
+From c8b4854a8fd371e9a087073dee87606b84bc665b Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Barbaros=20G=C3=B6ren?=
  <20913374+7tg@users.noreply.github.com>
 Date: Thu, 22 Oct 2026 17:08:51 +0300
@@ -21,6 +21,7 @@ the payload SDK omits, links through a facade as the store launcher's
 does. The log has the dialog's results and key counts, never the text.
 ---
  Makefile                          |  4 +-
+ PUBLICATION_ALLOWLIST.txt         |  9 +++
  native/pw_ime_ps5.c               | 99 +++++++++++++++++++++++++++++++
  native/pw_ime_ps5.h               | 41 +++++++++++++
  native/stubs/libSceCommonDialog.c |  4 ++
@@ -32,7 +33,7 @@ does. The log has the dialog's results and key counts, never the text.
  tests/test_pw_ime_chord.c         | 41 +++++++++++++
  tests/test_pw_text_keys.c         | 87 +++++++++++++++++++++++++++
  tools/build_native.sh             | 11 +++-
- 12 files changed, 461 insertions(+), 4 deletions(-)
+ 13 files changed, 470 insertions(+), 4 deletions(-)
  create mode 100644 native/pw_ime_ps5.c
  create mode 100644 native/pw_ime_ps5.h
  create mode 100644 native/stubs/libSceCommonDialog.c
@@ -65,6 +66,33 @@ index 9dcc796..b72de8f 100644
  	test_pw_wine_threads test_pw_wine_compat test_pw_wine_cwd test_pw_wine_cwd_listing test_pw_ws2_32_libc test_pw_launcher_render test_pw_pad \
  	test_pw_guest_fp test_pw_vm test_pw_x86_block test_pw_x86_flat test_pw_x86_cache test_pw_x86_code_pages test_pw_wow_smc_pages test_pw_wow_thread_budget test_pw_wow_tsc_clock test_pw_wow_call_top \
  	test_pw_x86_engine test_pw_x86_chaining test_pw_x86_residency test_pw_x86_global_residency test_pw_x86_reencode test_pw_x86_smc test_pw_x86_fault_markers test_pw_x86_lazyflags \
+diff --git a/PUBLICATION_ALLOWLIST.txt b/PUBLICATION_ALLOWLIST.txt
+index e25a352..18e3364 100644
+--- a/PUBLICATION_ALLOWLIST.txt
++++ b/PUBLICATION_ALLOWLIST.txt
+@@ -39,6 +39,7 @@ native/pw_videoout_ps5.c
+ native/pw_videoout_ps5.h
+ native/stubs/libSceAgc.c
+ native/stubs/libSceAgcDriver.c
++native/stubs/libSceCommonDialog.c
+ native/ps5log/ps5log.c
+ native/ps5log/ps5log.h
+ native/ps5log/ps5log_ps5_net.c
+@@ -305,6 +306,14 @@ tests/test_pw_hid.c
+ native/pw_hid_ps5.c
+ native/pw_hid_ps5.h
+ tests/test_pw_hid_ps5.c
++src/pw_text_keys.c
++src/pw_text_keys.h
++tests/test_pw_text_keys.c
++src/pw_ime_chord.c
++src/pw_ime_chord.h
++tests/test_pw_ime_chord.c
++native/pw_ime_ps5.c
++native/pw_ime_ps5.h
+ native/pw_data_mount.h
+ tests/test_pw_data_mount.c
+ tests/test_pw_data_mount_native.c
 diff --git a/native/pw_ime_ps5.c b/native/pw_ime_ps5.c
 new file mode 100644
 index 0000000..d09b486
