@@ -25,6 +25,8 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
 - Starts the game straight from its tile. **Hold □ while the tile starts** to open Sahin's
   page instead. The page has the resolution (3840×2160, 2560×1440 or 1920×1080), a
   performance overlay, the two options above, Repair (△) and Play.
+- Blur starts at its title screen: the install leaves out the intro movies (Activision's and
+  Bizarre Creations' logos, the attract movie). Your copy keeps them.
 - The game's button hints show the DualSense's buttons (✕ ○ □ △, L1/R1, L2/R2) instead of the
   Xbox 360 pad's. The picture is Sahin's own (`art/make-prompts.py`), swapped in by
   [DS2TexInject](https://github.com/sidnei-almeida/dead-space-2-texmod-linux), a texture plugin

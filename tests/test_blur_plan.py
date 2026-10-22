@@ -83,3 +83,7 @@ def test_playstation_prompts(tmp_path):
     assert {g["to"] for g in prompts} == {"scripts/DS2TexInject.asi", "DS2TexInject.ini", "texmod/"}
     assert all(g["source"] != "playstation-prompts" for o in p["options"] for g in o.get("game_files", []))
     assert {"texmod", "DS2TexInject.ini"} <= set(p["strip"])
+
+def test_no_intro_movies(tmp_path):
+    strip = plan(tmp_path)["strip"]
+    assert {"UI/movies/atvi.bik", "UI/movies/BizarreSplash.bik", "UI/movies/BlurAttract.bik"} <= set(strip)

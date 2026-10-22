@@ -106,7 +106,9 @@ int main()
            blur.game_files[1].to == "scripts/DS2TexInject.asi" && blur.game_files[3].to == "texmod/" &&
            blur.source("playstation-prompts") && blur.source("playstation-prompts")->url.empty());
     // What earlier mod installs left behind is stripped from the copy.
-    assert(blur.strip.size() == 11 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
+    assert(blur.strip.size() == 14 && blur.strip[0] == "dsound.dll" && blur.strip[3] == "scripts");
+    // The intro movies go too, so Blur starts at its title screen.
+    assert(blur.strip[11] == "UI/movies/atvi.bik" && blur.strip[13] == "UI/movies/BlurAttract.bik");
     // Blur keeps its picture size in its own settings.xml once the player saves the Graphics
     // page; the plan keeps it to the page's Resolution.
     assert(blur.user_files.size() == 1 &&

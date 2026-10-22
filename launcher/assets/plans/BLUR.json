@@ -41,7 +41,10 @@
   "blur_rpc.log",
   "texmod",
   "DS2TexInject.ini",
-  "DS2TexInject.log"
+  "DS2TexInject.log",
+  "UI/movies/atvi.bik",
+  "UI/movies/BizarreSplash.bik",
+  "UI/movies/BlurAttract.bik"
  ],
  "game_files": [
   {
