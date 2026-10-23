@@ -32,10 +32,10 @@ SOURCES = {
         "url": "https://cs.amax-emu.com/amax_client_files.zip",
     },
     "turkish": {
-        "name": "blur-tr 0.1.0 (7tg; Apache-2.0 code, CC BY-SA 4.0 translation)",
-        "sha256": "fccd1c6f878c814b0f3dcb82dcd9b24fa5b0a467b360d191f642fb6a32922da1",
-        "size": 750879,
-        "url": "https://github.com/7tg/blur-tr/releases/download/v0.1.0/blur-tr-v0.1.0.zip",
+        "name": "blur-tr 0.1.1 (7tg; Apache-2.0 code, CC BY-SA 4.0 translation)",
+        "sha256": "718cc9444cca6ea090b59c6cd5f6ad7dea96dfdec26febe2a660d4c033f248df",
+        "size": 750717,
+        "url": "https://github.com/7tg/blur-tr/releases/download/v0.1.1/blur-tr-v0.1.1.zip",
     },
     # Made by this repo (tools/build-prompts.sh), not downloaded: the app carries it in its
     # bundle, and tools/make-bundle.py fails if the built zip is not this one.

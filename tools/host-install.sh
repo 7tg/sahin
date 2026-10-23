@@ -32,7 +32,7 @@ clang++ -std=c++20 -O1 -g -Wall -Wextra -Wpedantic -Werror -I"$L/src" \
     "$L/src/library/game_install.cpp" "$L/src/library/upgrade.cpp" "$L/src/library/rtpatch.cpp" \
     "$L/src/library/install_plan.cpp" "$L/src/library/game_profile.cpp" \
     "$L/src/library/wine_registry.cpp" "$L/src/library/base_game.cpp" "$L/src/library/tree.cpp" \
-    "$L/src/core/save_file.cpp" "${objects[@]}" -pthread -o "$build/host-install"
+    "$L/src/core/save_file.cpp" "$L/src/core/i18n.cpp" "$L/src/core/i18n_strings.cpp" "${objects[@]}" -pthread -o "$build/host-install"
 
 # base-games/BLUR: a real copy of the user's folder (reflinked where the file system can).
 data=$HOST_DIR/data
