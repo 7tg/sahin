@@ -3,6 +3,8 @@
 #include "library/install_plan.hpp"
 #include "core/save_file.hpp"
 #include "third_party/yyjson/yyjson.h"
+#include <algorithm>
+#include <cctype>
 #include <memory>
 
 namespace store::library
@@ -531,6 +533,23 @@ bool parse_plan(std::string_view text, InstallPlan &out, std::string &error)
         option.description = read.text(item, "description", false, where);
         option.on = read.flag(item, "default", where);
         option.dll_overrides = read.text(item, "dll_overrides", false, where);
+        option.language = read.text(item, "language", false, where);
+        if (!option.language.empty() &&
+            !std::all_of(option.language.begin(), option.language.end(),
+                         [](char c) { return c >= 'a' && c <= 'z'; }))
+            read.fail(where + ": language must be a marker's lower-case name");
+        auto *languages = array(read, item, "default_languages");
+        yyjson_val *code = nullptr;
+        std::size_t code_index = 0, code_count = 0;
+        yyjson_arr_foreach(languages, code_index, code_count, code)
+        {
+            const std::string text = yyjson_is_str(code) ? yyjson_get_str(code) : "";
+            if (text.size() != 2 || !std::islower(static_cast<unsigned char>(text[0])) ||
+                !std::islower(static_cast<unsigned char>(text[1])))
+                read.fail(where + ": default_languages holds two-letter codes (\"tr\")");
+            else
+                option.default_languages.push_back(text);
+        }
         if (!safe_relative(option.id) || option.id.find('/') != std::string::npos)
             read.fail(where + ": id must be a plain name");
         if (plan.option(option.id))

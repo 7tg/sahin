@@ -100,7 +100,11 @@ int main()
     assert(blur.game == "BLUR" && blur.release == "1.2" && blur.prefix == "sahin" &&
            blur.profile.id == "pb-blur" && blur.profile.width == 3840 && blur.pending.empty() &&
            blur.game_files.size() == 4 && blur.game_files[0].to == "dsound.dll" &&
-           blur.options.size() == 2 && blur.option("online") && blur.upgrades.empty());
+           blur.options.size() == 3 && blur.option("online") && blur.upgrades.empty());
+    // Blur's Turkish text: on by default on a Turkish console only, with Blur kept in English.
+    assert(blur.option("turkish") && !blur.option("turkish")->on &&
+           (blur.option("turkish")->default_languages == std::vector<std::string>{"tr"}) &&
+           blur.option("turkish")->language == "english" && blur.option("online")->language.empty());
     // The PlayStation button prompts: carried in the app's bundle, so their source has no url.
     assert(blur.game_files[1].source == "playstation-prompts" &&
            blur.game_files[1].to == "scripts/DS2TexInject.asi" && blur.game_files[3].to == "texmod/" &&
@@ -448,6 +452,26 @@ int main()
         bad = option_text;
         bad.insert(bad.size() - 2, ", {\"id\": \"extra\", \"title\": \"Again\"}");
         assert(!parse_plan(bad, refused_plan, error) && error.find("named twice") != std::string::npos);
+        // A default by the console's language, and the marker the option needs.
+        auto languages = option_text;
+        languages.insert(languages.find("\"dll_overrides\": \";d3dx9_26"),
+                         "\"default_languages\": [\"tr\"], \"language\": \"english\", ");
+        InstallPlan by_language;
+        assert(parse_plan(languages, by_language, error));
+        assert((by_language.options[0].default_languages == std::vector<std::string>{"tr"}) &&
+               by_language.options[0].language == "english" && !by_language.options[0].on);
+        auto french = by_language;
+        language_defaults(french, 2); // a French console: as the plan says
+        assert(!french.options[0].on);
+        language_defaults(by_language, 19); // a Turkish one: on
+        assert(by_language.options[0].on);
+        bad = languages;
+        bad.replace(bad.find("[\"tr\"]"), 6, "[\"TR\"]");
+        assert(!parse_plan(bad, refused_plan, error) && error.find("two-letter") != std::string::npos);
+        bad = languages;
+        bad.replace(bad.find("\"english\""), 9, "\"../en\"");
+        assert(!parse_plan(bad, refused_plan, error) && error.find("language") != std::string::npos);
+        error.clear();
     }
     auto views = option_views(optional, paths, options);
     assert(views.size() == 1 && views[0].id == "extra" && views[0].title == "Extra look" &&
@@ -662,6 +686,29 @@ int main()
         nowhere.prefix = "nowhere";
         assert(!apply_system_language(nowhere, paths, 2, done, error) && !error.empty());
         error.clear();
+        // An option that needs a marker (Blur's Turkish text: English) keeps it, whatever the
+        // console's language.
+        assert(language_code(19) == "tr" && language_code(1) == "en" && language_code(18) == "en" &&
+               language_code(-1).empty() && language_code(99).empty());
+        fs::remove(folder / "italian.txt");
+        assert(apply_system_language(lang, paths, 2, done, error) && spelled(folder, "french.txt"));
+        assert(apply_system_language(lang, paths, 2, done, error, "english") &&
+               done == "french -> english" && spelled(folder, "english.txt"));
+        assert(apply_system_language(lang, paths, -1, done, error, "english") && done == "english already");
+        assert(apply_system_language(lang, paths, 2, done, error, "polish") && spelled(folder, "english.txt") &&
+               done.find("the options' polish isn't one") != std::string::npos);
+        InstallPlan needs = lang;
+        InstallPlan::Option text_pack;
+        text_pack.id = "text";
+        text_pack.language = "english";
+        needs.options = {text_pack};
+        needs.options[0].on = true;
+        // pb-test's install chose no options: its record says so, whatever the default.
+        assert(installed_language(needs, paths, options).empty());
+        needs.prefix = "pb-fresh"; // no install yet: the plan's default
+        assert(installed_language(needs, paths, options) == "english");
+        needs.options[0].on = false;
+        assert(installed_language(needs, paths, options).empty());
     }
 
     fs::remove_all(root);

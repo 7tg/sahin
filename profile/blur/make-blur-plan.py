@@ -31,6 +31,12 @@ SOURCES = {
         "size": 3300467,
         "url": "https://cs.amax-emu.com/amax_client_files.zip",
     },
+    "turkish": {
+        "name": "blur-tr 0.1.0 (7tg; Apache-2.0 code, CC BY-SA 4.0 translation)",
+        "sha256": "fccd1c6f878c814b0f3dcb82dcd9b24fa5b0a467b360d191f642fb6a32922da1",
+        "size": 750879,
+        "url": "https://github.com/7tg/blur-tr/releases/download/v0.1.0/blur-tr-v0.1.0.zip",
+    },
     # Made by this repo (tools/build-prompts.sh), not downloaded: the app carries it in its
     # bundle, and tools/make-bundle.py fails if the built zip is not this one.
     "playstation-prompts": {
@@ -66,6 +72,15 @@ AMAX_CLIENT = [
     {"source": "amax-client", "member": "discord-rpc.dll", "to": "discord-rpc.dll"},
     # No amax/dxvk.dll: without it the d3d9.dll proxy above hands off to system32's
     # d3d9.dll, which in the bare prefix is our DXVK already.
+]
+
+
+# blur-tr's ASI swaps Blur's English texts for Turkish ones as the game reads them (nothing of
+# the game's is changed), so the game stays in English: "language" keeps its marker english.txt
+# whatever the console's language. On by default on a Turkish console.
+TURKISH = [
+    {"source": "turkish", "member": "scripts/blur_tr.asi", "to": "scripts/blur_tr.asi"},
+    {"source": "turkish", "member": "scripts/blur-tr-oltx/", "to": "scripts/blur-tr-oltx/"},
 ]
 
 
@@ -137,6 +152,15 @@ def plan():
                 "default": False,
                 "game_files": AMAX_CLIENT,
                 "dll_overrides": "d3d9=n",
+            },
+            {
+                "id": "turkish",
+                "title": "Turkish text",
+                "description": "Blur's menus and texts in Turkish (blur-tr); the voices stay English.",
+                "default": False,
+                "default_languages": ["tr"],
+                "language": "english",
+                "game_files": TURKISH,
             },
         ],
         "upgrades": [],

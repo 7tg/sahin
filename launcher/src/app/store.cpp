@@ -3113,20 +3113,24 @@ void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, cons
     // The choices, each a row of segments; the D-pad's row is lit.
     const auto rows = single_rows(app);
     const int lit_row = std::clamp(single_row_, 0, std::max(0, static_cast<int>(rows.size()) - 1));
+    // More than four rows sit closer, so what the lit row does stays above the buttons.
+    const bool tight = rows.size() > 4;
+    const float pitch = tight ? 84.0f : 100.0f, label = tight ? 21.0f : 28.0f,
+                segments = tight ? 30.0f : 40.0f;
     float y = box.y + 176.0f;
     for (std::size_t r = 0; r < rows.size(); ++r)
     {
         const bool lit = static_cast<int>(r) == lit_row;
         if (lit)
-            list.bordered_rect({x - 14.0f, y, w + 28.0f, 92.0f}, 20, kInk.with_alpha(0.06f), 1.5f,
+            list.bordered_rect({x - 14.0f, y, w + 28.0f, pitch - 6.0f}, 20, kInk.with_alpha(0.06f), 1.5f,
                                kAccent.with_alpha(0.55f));
         ui::text(list, fonts.semibold, fonts.semibold.font->fit(i18n::upper(rows[r].name), 15, w), x,
-                 y + 28.0f, 15, kInk.with_alpha(lit ? 0.8f : 0.5f), gfx::Align::left, 3.0f);
+                 y + label, 15, kInk.with_alpha(lit ? 0.8f : 0.5f), gfx::Align::left, 3.0f);
         const auto count = static_cast<float>(rows[r].values.size());
         const float width = (w - 8.0f * (count - 1.0f)) / count;
         for (std::size_t i = 0; i < rows[r].values.size(); ++i)
         {
-            const Rect segment{x + (width + 8.0f) * static_cast<float>(i), y + 40.0f, width, 40.0f};
+            const Rect segment{x + (width + 8.0f) * static_cast<float>(i), y + segments, width, 40.0f};
             const bool chosen = static_cast<int>(i) == rows[r].value;
             if (chosen)
                 list.rounded_rect(segment, 20, lit ? kAccent : kInk.with_alpha(0.2f));
@@ -3137,7 +3141,7 @@ void Screen::draw_single_setup(const ui::Fonts &fonts, gfx::DrawList &list, cons
                      chosen && lit ? kOnAccent : kInk.with_alpha(chosen ? 0.95f : 0.62f),
                      gfx::Align::center);
         }
-        y += 100.0f;
+        y += pitch;
     }
     // What the lit row does.
     if (!rows.empty())

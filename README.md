@@ -22,9 +22,13 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
     [Amax](https://amax-emu.com) community servers
   - **Amax client extras** (off by default): Amax's client, with profile pictures and its Lua
     plugins
+  - **Turkish text** (on by default on a console set to Turkish, off on any other):
+    [blur-tr](https://github.com/7tg/blur-tr), which shows Blur's menus and texts in Turkish.
+    The voices stay English, and Blur stays in English underneath whatever the console's
+    language
 - Starts the game straight from its tile. **Hold □ while the tile starts** to open Sahin's
   page instead. The page has the resolution (3840×2160, 2560×1440 or 1920×1080), a
-  performance overlay, the two options above, Repair (△) and Play.
+  performance overlay, the three options above, Repair (△) and Play.
 - Blur starts at its title screen: the install leaves out the intro movies (Activision's and
   Bizarre Creations' logos, the attract movie). Your copy keeps them.
 - The game's button hints show the DualSense's buttons (✕ ○ □ △, L1/R1, L2/R2) instead of the
@@ -63,7 +67,8 @@ SHA-256. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
 2. Copy your Blur folder to `/data/sahin/base-games/Blur` over FTP, or put it on a USB drive
    in a folder named `Blur`. A USB copy is copied to the console as part of the install.
 3. Open Sahin and press Install. It downloads the mods, copies your game into the prefix and
-   adds them. Downloads are about 4 MB, or 7 MB with the Amax client extras.
+   adds them. Downloads are about 4 MB, 1 MB more with the Turkish text, 3 MB more with the Amax
+   client extras.
 
 To start from a save you have (your own, or a finished one), put Blur's `blursave` file in
 `/data/sahin/saves/Blur/` before you install. A fresh install places it where Blur keeps its
@@ -119,8 +124,8 @@ Checks on the build machine, without a console:
 - Wine, Mesa, DXVK and LLVM: the stack underneath.
 - The mods, each downloaded from its own page: the
   [Ultimate ASI Loader](https://github.com/ThirteenAG/Ultimate-ASI-Loader) (ThirteenAG),
-  [amax-redirect](https://github.com/Aib0t/amax-dns-asi) (Aib0t) and the Amax client (the Amax
-  team).
+  [amax-redirect](https://github.com/Aib0t/amax-dns-asi) (Aib0t), the Amax client (the Amax
+  team) and [blur-tr](https://github.com/7tg/blur-tr).
 - *Blur* is Activision's. Sahin is not affiliated with Activision, Bizarre Creations or Sony.
 
 ## License

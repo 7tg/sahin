@@ -138,9 +138,18 @@ std::vector<std::string> marker_languages(std::string_view text);
 // The installed game's marker renamed to the system language, when it offers that language.
 // Nothing changes when it doesn't, when the folder has no marker or more than one, or when the
 // marker already says so. done says what happened, for the log. False with error set when the
-// game isn't installed or the rename fails.
+// game isn't installed or the rename fails. needed, when not empty, is the marker an installed
+// option needs (installed_language), and is kept in place of the system language.
 bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, int system_language,
-                           std::string &done, std::string &error);
+                           std::string &done, std::string &error, const std::string &needed = {});
+// A PS5 system language as its ISO 639-1 code ("tr" for 19), "" for one we don't know.
+std::string language_code(int system_language);
+// The plan's options turned on whose default_languages hold the system language's code: the
+// defaults the page offers before any install (Blur's Turkish text on a Turkish console).
+void language_defaults(InstallPlan &plan, int system_language);
+// The marker language the installed options need (their "language"), "" when none does.
+std::string installed_language(const InstallPlan &plan, const InstallPaths &paths,
+                               const InstallOptions &options);
 
 // The plan's user files (install_plan.hpp) edited in each Windows user's folder of its prefix
 // that holds them, to the plan's profile size: after an install writes the profile, and when a

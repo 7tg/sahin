@@ -159,7 +159,8 @@ in the repository, GPL-3.0-or-later. Nothing comes from the game.
 The app ships no mod. At install the console downloads, each pinned by SHA-256
 in `assets/plans/BLUR.json`, the Ultimate ASI Loader (ThirteenAG, MIT),
 amax-redirect.asi (Aib0t, MIT) and, if chosen, the Amax client files from
-amax-emu.com, each from its own page.
+amax-emu.com and blur-tr's Turkish text (github.com/7tg/blur-tr: its ASI
+Apache-2.0, its translation CC BY-SA 4.0), each from its own page.
 
 {MARK}
 

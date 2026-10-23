@@ -17,6 +17,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <map>
+#include <iterator>
 #include <memory>
 #include <set>
 #include <strings.h>
@@ -707,8 +708,38 @@ std::vector<std::string> marker_languages(std::string_view text)
     return languages;
 }
 
+std::string language_code(int system_language)
+{
+    // SCE_SYSTEM_PARAM_LANG_*, in their order.
+    static constexpr const char *kCodes[] = {"ja", "en", "fr", "es", "de", "it", "nl", "pt",
+                                             "ru", "ko", "zh", "zh", "fi", "sv", "da", "no",
+                                             "pl", "pt", "en", "tr", "es", "ar", "fr", "cs",
+                                             "hu", "el", "ro", "th", "vi", "id", "uk"};
+    return system_language >= 0 && system_language < static_cast<int>(std::size(kCodes))
+               ? kCodes[system_language]
+               : "";
+}
+
+void language_defaults(InstallPlan &plan, int system_language)
+{
+    const auto code = language_code(system_language);
+    for (auto &option : plan.options)
+        if (!code.empty() && std::find(option.default_languages.begin(), option.default_languages.end(),
+                                       code) != option.default_languages.end())
+            option.on = true;
+}
+
+std::string installed_language(const InstallPlan &plan, const InstallPaths &paths,
+                               const InstallOptions &options)
+{
+    for (const auto &view : option_views(plan, paths, options))
+        if (const auto *option = plan.option(view.id); view.on && option && !option->language.empty())
+            return option->language;
+    return "";
+}
+
 bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, int system_language,
-                           std::string &done, std::string &error)
+                           std::string &done, std::string &error, const std::string &needed)
 {
     std::string games;
     if (!resolve(paths.win_root + "/prefixes/" + plan.prefix, "drive_c/Games", false, games) ||
@@ -722,7 +753,7 @@ bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, i
     for (const auto &name : names_in(folder))
         if (std::string language; marker_named(name, &language) && is_file(folder + "/" + name))
             markers.emplace_back(name, language);
-    const std::string wanted = marker_language(system_language);
+    const std::string wanted = needed.empty() ? marker_language(system_language) : needed;
     if (markers.size() != 1)
     {
         done = markers.empty() ? "no language file" : "more than one language file, left alone";
@@ -734,8 +765,9 @@ bool apply_system_language(const InstallPlan &plan, const InstallPaths &paths, i
     const auto offered = marker_languages(text);
     if (wanted.empty() || std::find(offered.begin(), offered.end(), wanted) == offered.end())
     {
-        done = "system language " + std::to_string(system_language) + " isn't one this copy has; " +
-               current + " kept";
+        done = (needed.empty() ? "system language " + std::to_string(system_language)
+                               : "the options' " + needed) +
+               " isn't one this copy has; " + current + " kept";
         return true;
     }
     if (wanted == current)

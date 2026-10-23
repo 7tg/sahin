@@ -143,6 +143,12 @@ struct InstallPlan
     {
         std::string id, title, description;
         bool on = false; // the plan's default ("default")
+        // On by default too on a console in one of these languages (ISO 639-1, "tr"):
+        // "default_languages". library::language_defaults applies them.
+        std::vector<std::string> default_languages;
+        // The game's language marker it needs (Blur's "english" for a text pack that replaces
+        // the English texts): "language". Kept in place of the console's when it is installed.
+        std::string language;
         std::vector<Placement> game_files, system_files;
         std::vector<TextFile> texts;
         std::vector<IniEdit> ini;

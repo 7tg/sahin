@@ -87,3 +87,15 @@ def test_playstation_prompts(tmp_path):
 def test_no_intro_movies(tmp_path):
     strip = plan(tmp_path)["strip"]
     assert {"UI/movies/atvi.bik", "UI/movies/BizarreSplash.bik", "UI/movies/BlurAttract.bik"} <= set(strip)
+
+def test_turkish_text(tmp_path):
+    p = plan(tmp_path)
+    opts = {o["id"]: o for o in p["options"]}
+    tr = opts["turkish"]
+    # Off by default, on by default on a Turkish console; the game stays English underneath.
+    assert tr["default"] is False and tr["default_languages"] == ["tr"] and tr["language"] == "english"
+    assert {(g["member"], g["to"]) for g in tr["game_files"]} == {
+        ("scripts/blur_tr.asi", "scripts/blur_tr.asi"),
+        ("scripts/blur-tr-oltx/", "scripts/blur-tr-oltx/")}
+    assert p["sources"]["turkish"]["url"].startswith("https://github.com/7tg/blur-tr/releases/download/")
+    assert all(g["source"] != "turkish" for g in p["game_files"])

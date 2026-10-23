@@ -24,6 +24,12 @@
    "size": 3300467,
    "url": "https://cs.amax-emu.com/amax_client_files.zip"
   },
+  "turkish": {
+   "name": "blur-tr 0.1.0 (7tg; Apache-2.0 code, CC BY-SA 4.0 translation)",
+   "sha256": "fccd1c6f878c814b0f3dcb82dcd9b24fa5b0a467b360d191f642fb6a32922da1",
+   "size": 750879,
+   "url": "https://github.com/7tg/blur-tr/releases/download/v0.1.0/blur-tr-v0.1.0.zip"
+  },
   "playstation-prompts": {
    "name": "PlayStation button prompts (Sahin; DS2TexInject, MIT)",
    "sha256": "f4c07db4826b2ff939ebf5584014793be7f0b69f1e7986122e11bfed779b23d8",
@@ -161,6 +167,28 @@
     }
    ],
    "dll_overrides": "d3d9=n"
+  },
+  {
+   "id": "turkish",
+   "title": "Turkish text",
+   "description": "Blur's menus and texts in Turkish (blur-tr); the voices stay English.",
+   "default": false,
+   "default_languages": [
+    "tr"
+   ],
+   "language": "english",
+   "game_files": [
+    {
+     "source": "turkish",
+     "member": "scripts/blur_tr.asi",
+     "to": "scripts/blur_tr.asi"
+    },
+    {
+     "source": "turkish",
+     "member": "scripts/blur-tr-oltx/",
+     "to": "scripts/blur-tr-oltx/"
+    }
+   ]
   }
  ],
  "upgrades": []

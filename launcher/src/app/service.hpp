@@ -125,6 +125,9 @@ class Service
     std::string bundle;
     std::string win_root = "/data/prospero-win";
     std::string game_prefix;
+    // The PS5's language (SCE_SYSTEM_SERVICE_PARAM_ID_LANG), -1 unknown: plan options turn on
+    // by default for it (library::language_defaults).
+    int system_language = -1;
     // The settings file, written by a worker: never on the frame.
     bool save_settings(std::string text);
     // Where settings are kept; empty means the store folder's settings.txt. Set before

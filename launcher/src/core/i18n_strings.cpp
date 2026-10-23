@@ -315,6 +315,9 @@ const Row kStrings[] = {
     {{"Amax client extras", "Amax istemci ekleri"}},
     {{"Amax's client: profile pictures, its Lua plugins and a 60 fps race cap.",
       "Amax'ın istemcisi: profil resimleri, Lua eklentileri ve yarışlarda 60 fps sınırı."}},
+    {{"Turkish text", "Türkçe metinler"}},
+    {{"Blur's menus and texts in Turkish (blur-tr); the voices stay English.",
+      "Blur'ün menüleri ve metinleri Türkçe (blur-tr); sesler İngilizce kalır."}},
 };
 
 const std::size_t kStringCount = sizeof(kStrings) / sizeof(kStrings[0]);

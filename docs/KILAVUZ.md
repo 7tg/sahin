@@ -17,6 +17,8 @@ bulunur. Sahin'in Activision, Bizarre Creations veya Sony ile bir bağlantısı 
 - **Bölünmüş ekran:** dört DualSense kumandaya kadar, oturum açmış her kullanıcı için bir
   kumanda.
 - **Çevrimiçi oyun:** Amax topluluk sunucuları üzerinden (varsayılan olarak açık).
+- **Türkçe metinler:** [blur-tr](https://github.com/7tg/blur-tr) ile Blur'un menüleri ve
+  metinleri Türkçe. Konsolunuzun dili Türkçeyse varsayılan olarak açık, değilse kapalıdır.
 - Dokunmatik yüzey fare gibi çalışır.
 - Oyunda yazı yazmak için PS5'in kendi klavyesi açılır.
 - İsterseniz oyuna kendi kayıt dosyanızla başlayabilirsiniz.
@@ -41,8 +43,8 @@ bulunur. Sahin'in Activision, Bizarre Creations veya Sony ile bir bağlantısı 
 3. Blur klasörünüzü FTP ile `/data/sahin/base-games/Blur` konumuna kopyalayın. Ya da bir USB
    belleğe `Blur` adlı bir klasör olarak koyun; USB'deki kopya kurulum sırasında konsola
    aktarılır.
-4. Sahin'i açın ve **Install**'a basın. Sahin modları indirir (yaklaşık 4 MB, Amax istemci
-   eklentileriyle 7 MB), oyununuzu öneke kopyalar ve modları ekler.
+4. Sahin'i açın ve **Install**'a basın. Sahin modları indirir (yaklaşık 4 MB; Türkçe metinlerle
+   1 MB, Amax istemci eklentileriyle 3 MB daha), oyununuzu öneke kopyalar ve modları ekler.
 
 Bundan sonra kutucuk oyunu doğrudan başlatır.
 
@@ -62,6 +64,9 @@ Kutucuk açılırken **□ (Kare)** tuşunu basılı tutarsanız oyun yerine Sah
 - **Online through Amax:** Amax sunucularıyla çevrimiçi oyun, açık ya da kapalı
 - **Amax client extras:** Amax istemcisi, profil resimleri ve Lua eklentileriyle, açık ya da
   kapalı (varsayılan olarak kapalı)
+- **Türkçe metinler:** Blur'un menüleri ve metinleri Türkçe, açık ya da kapalı (konsolun dili
+  Türkçeyse varsayılan olarak açık). Sesler İngilizce kalır; açıkken oyun, konsolun dili ne
+  olursa olsun İngilizce dil dosyasıyla başlar, çünkü çeviri İngilizce metinlerin yerine geçer.
 - **Repair (△):** kurulumu onarır; kayıtlarınıza dokunmaz
 - **Play:** oyunu başlatır
 

@@ -405,6 +405,7 @@ bool Service::game_plan(const catalog::Entry &entry, library::InstallPlan &plan,
     }
     if (!library::load_plan(plans + "/" + manifest->folder + ".json", plan, error))
         return false;
+    library::language_defaults(plan, system_language);
     options = {};
     options.now = std::time(nullptr);
     options.app_version = version_;

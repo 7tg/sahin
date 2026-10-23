@@ -67,9 +67,11 @@ extern "C" int sceSystemServiceParamGetInt(int id, int *value);
 namespace
 {
 // This app's game's plan, for the prefix the settings install into (the plan's when they name
-// none). False when there is none.
+// none); given, when asked for, is the plan as it reads, with its options, and options the
+// prefix. False when there is none.
 bool single_game_plan(const std::string &app_root, const std::string &storage_root,
-                      store::library::InstallPlan &out)
+                      store::library::InstallPlan &out, store::library::InstallPlan *given = nullptr,
+                      store::library::InstallOptions *chosen = nullptr)
 {
     std::string saved, error;
     hui::save::read_file(storage_root + "/settings.txt", &saved, 4096);
@@ -85,6 +87,10 @@ bool single_game_plan(const std::string &app_root, const std::string &storage_ro
         if (!settings.game_prefix.empty() && settings.game_prefix != plan.prefix)
             options.prefix = settings.game_prefix;
         out = store::library::effective_plan(plan, options);
+        if (given)
+            *given = std::move(plan);
+        if (chosen)
+            *chosen = std::move(options);
         return true;
     }
     return false;
@@ -117,14 +123,18 @@ int system_language()
 // The game in the PS5's language, when the copy has it (store::library::apply_system_language).
 void apply_system_language(const std::string &app_root, const std::string &storage_root, int language)
 {
-    store::library::InstallPlan plan;
+    store::library::InstallPlan plan, given;
+    store::library::InstallOptions options;
     std::string done, error;
-    if (language < 0)
-        hui::sys::log("[STORE] language: unknown, the copy's language file left alone");
-    else if (!single_game_plan(app_root, storage_root, plan))
+    const store::library::InstallPaths paths{storage_root, "/data/prospero-win"};
+    if (!single_game_plan(app_root, storage_root, plan, &given, &options))
         hui::sys::log("[STORE] language: no plan");
-    else if (!store::library::apply_system_language(plan, {storage_root, "/data/prospero-win"},
-                                                    language, done, error))
+    // An installed option may need its own language (Blur's Turkish text: English), whatever
+    // the console's is.
+    else if (const auto needed = store::library::installed_language(given, paths, options);
+             language < 0 && needed.empty())
+        hui::sys::log("[STORE] language: unknown, the copy's language file left alone");
+    else if (!store::library::apply_system_language(plan, paths, language, done, error, needed))
         hui::sys::log("[STORE] language: %s", error.c_str());
     else
         hui::sys::log("[STORE] language: system %d, %s", language, done.c_str());
@@ -343,12 +353,10 @@ int main()
     const std::string app_root = store::system::app_folder();
     sys::log("[STORE] app folder=%s", app_root.c_str());
     // The page in the PS5's language: Turkish on a Turkish console, English on any other.
-    {
-        const int language = system_language();
-        store::i18n::set_language(store::i18n::from_console(language));
-        sys::log("[STORE] language: system %d, page %s", language,
-                 store::i18n::language() == store::i18n::Language::turkish ? "Turkish" : "English");
-    }
+    const int console_language = system_language();
+    store::i18n::set_language(store::i18n::from_console(console_language));
+    sys::log("[STORE] language: system %d, page %s", console_language,
+             store::i18n::language() == store::i18n::Language::turkish ? "Turkish" : "English");
     // A game's own app shows its screen only when the game isn't installed yet, when the
     // game's in-game menu left choices to apply (or asked for this screen), when the game
     // closed right after it started, or when Square is held as it starts. Otherwise a start
@@ -543,6 +551,7 @@ int main()
     // Files the manager carries for them (plan sources by SHA-256, the bare prefix).
     service.bundle = app_root + "/assets/bundle";
     service.game_prefix = screen.settings().game_prefix;
+    service.system_language = console_language;
 #ifdef STORE_INSTALLER
     service.installer = elevated;
     const char *installer_reason = "This console didn't grant permission to write, so nothing "

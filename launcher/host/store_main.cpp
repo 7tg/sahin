@@ -520,7 +520,10 @@ int main(int argc, char **argv)
                                  {"amax-client", "Amax client extras",
                                   "Amax's client: profile pictures, its Lua plugins and a 60 fps "
                                   "race cap.",
-                                  false}});
+                                  false},
+                                 {"turkish", "Turkish text",
+                                  "Blur's menus and texts in Turkish (blur-tr); the voices stay English.",
+                                  store::i18n::language() == store::i18n::Language::turkish}});
                 if (mode.starts_with("mw-solo"))
                 {
                     // The game's own app: its page only (installed, the player quit to it).
@@ -567,7 +570,7 @@ int main(int argc, char **argv)
                 else if (mode == "mw-solo-installed-resolution")
                 {
                     // A game's own app: 2560x1440 picked, kept at once; Cross still plays.
-                    for (int i = 0; i < 2; ++i)
+                    for (int i = 0; i < 3; ++i)
                     {
                         screen.update(down, 1.0f / 60.0f, feedback);
                         settle(8);
