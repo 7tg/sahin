@@ -570,7 +570,13 @@ InstallPlan effective_plan(const InstallPlan &plan, const InstallOptions &option
         out.texts.insert(out.texts.end(), option.texts.begin(), option.texts.end());
         out.ini.insert(out.ini.end(), option.ini.begin(), option.ini.end());
         out.expect.insert(out.expect.end(), option.expect.begin(), option.expect.end());
-        out.profile.dll_overrides += option.dll_overrides;
+        // Wine's overrides are ';'-separated: one goes between, whether the option's text
+        // starts with it (";d3dx9_26=n") or not ("d3d9=n").
+        auto &overrides = out.profile.dll_overrides;
+        if (!overrides.empty() && overrides.back() != ';' && !option.dll_overrides.empty() &&
+            option.dll_overrides.front() != ';')
+            overrides += ';';
+        overrides += option.dll_overrides;
     }
     out.options.clear(); // added: an install of the result has none left to choose
     if (options.cursor == Cursor::touchpad)

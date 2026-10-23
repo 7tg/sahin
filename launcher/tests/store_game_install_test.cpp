@@ -482,6 +482,12 @@ int main()
     assert(chosen_plan.options.empty() && chosen_plan.game_files.size() == plan.game_files.size() + 1 &&
            chosen_plan.profile.dll_overrides == "dinput8=n,b;d3dx9_26=n" &&
            chosen_plan.expect.size() == plan.expect.size() + 1);
+    {
+        // An option's overrides without a leading ';' get one: Blur's Amax client ("d3d9=n").
+        auto bare = optional;
+        bare.options[0].dll_overrides = "d3d9=n";
+        assert(effective_plan(bare, with).profile.dll_overrides == "dinput8=n,b;d3d9=n");
+    }
     assert(missing_sources(chosen_plan, (data / "mods-cache").string(), go).size() == 1);
     assert(missing_sources(effective_plan(optional, options), (data / "mods-cache").string(), go).empty());
     cache(data, extra, ".asi");
