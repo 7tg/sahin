@@ -184,7 +184,7 @@ if want apps; then
         [[ -f $W/art/$art.at9 ]] && args+=(--music "$W/art/$art.at9")
         tools/build_game_app.sh "${args[@]}"
     done <<'APPS'
-PPSA99404|Sahin|pb-blur|sahin|SAHINBLUR0000000|UP0000|01.006.000
+PPSA99404|Sahin|pb-blur|sahin|SAHINBLUR0000000|UP0000|01.007.000
 APPS
 fi
 if want dxvk; then
