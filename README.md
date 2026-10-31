@@ -1,6 +1,7 @@
 # Sahin
 
 [![Downloads](https://img.shields.io/github/downloads/7tg/sahin/total?label=downloads)](https://github.com/7tg/sahin/releases)
+[![Visits](https://hits.sh/github.com/7tg/sahin.svg?label=visits)](https://hits.sh/github.com/7tg/sahin/)
 [![ProsperoStore](https://img.shields.io/badge/ProsperoStore-PPSA99404-0070d1?logo=playstation&logoColor=white)](https://prosperostore.net/app/PPSA99404/)
 
 Sahin runs your own copy of the PC game *Blur* (Bizarre Creations, 2010) on a jailbroken
