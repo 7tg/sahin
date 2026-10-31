@@ -1,5 +1,8 @@
 # Sahin
 
+[![Downloads](https://img.shields.io/github/downloads/7tg/sahin/total?label=downloads)](https://github.com/7tg/sahin/releases)
+[![ProsperoStore](https://img.shields.io/badge/ProsperoStore-PPSA99404-0070d1?logo=playstation&logoColor=white)](https://prosperostore.net/app/PPSA99404/)
+
 Sahin runs your own copy of the PC game *Blur* (Bizarre Creations, 2010) on a jailbroken
 PS5, as a homebrew app with its own Home-screen tile (`PPSA99404`). It runs the PC version
 through [prospero-win](https://github.com/mpereiraesaa/prospero-win): Wine, DXVK and the
